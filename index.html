@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aniduble</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;800&family=Nunito+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f2fb;--ink:#1b1840;--card:#fff;--mut:#6b6890;--acc:#e5486f;--acc2:#6f5cf0;--line:#dcd8ec;--shadow:0 10px 30px rgba(40,30,90,.14)}
+@media(prefers-color-scheme:dark){:root{--bg:#0f0d22;--ink:#efecfa;--card:#1a1735;--mut:#a29fc4;--acc:#ff5c8a;--acc2:#9b8cff;--line:#2e2a58;--shadow:0 12px 34px rgba(0,0,0,.5)}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg,#0f0d22);color:var(--ink,#efecfa);font:400 16px/1.55 'Nunito Sans',system-ui,sans-serif}
+h1,h2,h3{font-family:'Bricolage Grotesque',system-ui,sans-serif;margin:0}
+header{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 5vw;border-bottom:1px solid var(--line,#2e2a58);background:color-mix(in srgb,var(--bg,#0f0d22) 88%,transparent);backdrop-filter:blur(10px);flex-wrap:wrap}
+.logo{font:800 26px 'Bricolage Grotesque',sans-serif;cursor:pointer;letter-spacing:-.5px}
+.logo b{color:var(--acc,#ff5c8a)}
+nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+nav span{color:var(--mut,#a29fc4);font-weight:600}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line,#2e2a58);background:var(--card,#1a1735);padding:9px 18px;border-radius:12px;transition:transform .15s,box-shadow .15s,background .15s}
+button:hover{box-shadow:var(--shadow,0 12px 34px rgba(0,0,0,.5))}
+button:active{transform:scale(.97)}
+button.pri{background:var(--acc,#ff5c8a);border-color:var(--acc,#ff5c8a);color:#fff;font-weight:600}
+button.del{color:var(--acc,#ff5c8a)}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--acc,#ff5c8a);outline-offset:2px}
+main{padding:30px 5vw 70px;max-width:1240px;margin:auto}
+.tools{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:26px}
+.tools input,.tools select{padding:11px 14px;border-radius:12px;border:1px solid var(--line,#2e2a58);background:var(--card,#1a1735)}
+.tools input{flex:1;min-width:200px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:26px}
+.item{cursor:pointer}
+.poster{position:relative;aspect-ratio:2/3;border-radius:16px;background:var(--card,#1a1735) center/cover;border:1px solid var(--line,#2e2a58);display:flex;align-items:center;justify-content:center;overflow:hidden;transition:transform .2s,box-shadow .2s}
+.item:hover .poster,.item:focus-visible .poster{transform:translateY(-5px);box-shadow:var(--shadow,0 12px 34px rgba(0,0,0,.5))}
+.ph{font:800 72px 'Bricolage Grotesque',sans-serif;color:var(--acc2,#9b8cff);opacity:.7}
+.chip{position:absolute;top:10px;left:10px;background:rgba(15,13,34,.78);color:#fff;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px}
+.item h3{font-size:17px;margin:12px 0 2px;line-height:1.25}
+.item small{color:var(--mut,#a29fc4)}
+.form,.panel{background:var(--card,#1a1735);border:1px solid var(--line,#2e2a58);border-radius:18px;padding:24px;max-width:540px;box-shadow:var(--shadow,0 12px 34px rgba(0,0,0,.5))}
+.center{margin:0 auto}
+.form label{display:block;font-weight:600;margin:14px 0 4px}
+.form input,.form textarea{width:100%;padding:11px 13px;border-radius:12px;border:1px solid var(--line,#2e2a58);background:var(--bg,#0f0d22);margin-top:8px}
+.form label+input,.form label+textarea{margin-top:0}
+.err{color:var(--acc,#ff5c8a);min-height:22px;margin-top:10px;font-weight:600}
+.hero{min-height:58vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px}
+.hero h1{font-size:clamp(38px,7vw,72px);line-height:1.05;letter-spacing:-1.5px}
+.hero h1 b{color:var(--acc,#ff5c8a)}
+.hero p{color:var(--mut,#a29fc4);max-width:460px;margin:0 0 6px}
+.hero .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.detail{display:grid;grid-template-columns:280px 1fr;gap:34px}
+.detail .poster{box-shadow:var(--shadow,0 12px 34px rgba(0,0,0,.5))}
+.detail h2{font-size:clamp(28px,4vw,42px);line-height:1.1}
+.player{width:100%;aspect-ratio:16/9;border:0;border-radius:16px;background:#000;margin-top:16px;box-shadow:var(--shadow,0 12px 34px rgba(0,0,0,.5))}
+.bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;gap:10px;flex-wrap:wrap}
+.empty{color:var(--mut,#a29fc4);padding:40px 0}
+.eps{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+.eps button{border-radius:999px;padding:7px 16px}
+.eps button.on{background:var(--acc,#ff5c8a);border-color:var(--acc,#ff5c8a);color:#fff}
+.sec{margin-top:36px;max-width:660px}
+.cm{border-top:1px solid var(--line,#2e2a58);padding:12px 0}
+.cm small{color:var(--mut,#a29fc4)}
+/* Bosh sahifa */
+.land{display:grid;grid-template-columns:1.1fr .9fr;align-items:center;gap:40px;min-height:60vh}
+.land h1{font-size:clamp(40px,6vw,74px);line-height:1.02;letter-spacing:-2px}
+.land p{color:var(--mut,#a29fc4);font-size:18px;max-width:480px;margin:18px 0 28px}
+.land .btns{display:flex;gap:12px;flex-wrap:wrap}
+.land .btns button{padding:14px 28px;font-size:17px;border-radius:14px}
+.fan{position:relative;height:430px}
+.wc{position:absolute;width:200px;aspect-ratio:2/3;border-radius:18px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;color:#fff;box-shadow:var(--shadow,0 12px 34px rgba(0,0,0,.5));animation:rise .6s cubic-bezier(.2,.8,.2,1) backwards}
+.wc{overflow:hidden}
+.wc::after{content:'';position:absolute;left:0;right:0;bottom:0;height:38%;background:linear-gradient(transparent,rgba(0,0,0,.6))}
+.art{position:absolute;inset:0}
+.art svg{width:100%;height:100%;display:block}
+.wc .k,.wc b{position:relative;z-index:1;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+.wc .k{font-size:40px;font-weight:800;line-height:1}
+.wc b{font-weight:600;opacity:.9}
+.wc.a{background:var(--acc2,#9b8cff);left:4%;top:44px;--r:-9deg;transform:rotate(-9deg)}
+.wc.b{background:var(--acc,#ff5c8a);left:30%;top:0;--r:3deg;transform:rotate(3deg);z-index:2;animation-delay:.12s}
+.wc.c{background:#1b1840;border:1px solid var(--line,#2e2a58);left:56%;top:64px;--r:11deg;transform:rotate(11deg);animation-delay:.24s}
+@keyframes rise{from{opacity:0;transform:translateY(40px) rotate(0)}to{opacity:1;transform:rotate(var(--r))}}
+.feats{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:56px;border-top:1px solid var(--line,#2e2a58);padding-top:26px}
+.feats b{display:block;font:700 19px 'Bricolage Grotesque',sans-serif;margin-bottom:4px}
+.feats span{color:var(--mut,#a29fc4)}
+/* Kirish / ro'yxatdan o'tish oynasi (markazda) */
+.overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(8,6,22,.68);backdrop-filter:blur(5px);overflow:auto}
+.auth{position:relative;display:grid;grid-template-columns:1fr 1fr;width:min(820px,100%);border-radius:22px;overflow:hidden;background:var(--card,#1a1735);box-shadow:var(--shadow,0 12px 34px rgba(0,0,0,.5));animation:pop .22s ease-out}
+@keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+.auth-art{position:relative;background:#1b1840;color:#fff;padding:40px 34px;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;min-height:440px;overflow:hidden}
+.auth-art .logo{font-size:34px;cursor:default}
+.auth-art p{margin:0;opacity:.8;max-width:260px}
+.auth-art::after{content:'アニメ';position:absolute;top:18px;right:22px;writing-mode:vertical-rl;font-size:76px;font-weight:800;opacity:.12;line-height:1}
+.auth-form{position:relative;padding:40px 36px;display:flex;flex-direction:column;justify-content:center}
+.auth-form h2{font-size:28px;margin-bottom:4px}
+.auth-form .sub{color:var(--mut,#a29fc4);margin:0 0 16px}
+.auth-form label{display:block;font-weight:600;margin:12px 0 5px}
+.auth-form input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line,#2e2a58);background:var(--bg,#0f0d22);min-height:46px}
+.auth-form .go{width:100%;margin-top:14px;min-height:48px;font-size:17px}
+.m-logo{display:none}
+.tabs{display:flex;gap:4px;background:var(--bg,#0f0d22);padding:4px;border-radius:14px;margin-bottom:20px}
+.tab{flex:1;border:0;background:transparent;padding:10px;border-radius:11px}
+.tab.on{background:var(--card,#1a1735);font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.x{position:absolute;top:10px;right:12px;border:0;background:transparent;font-size:26px;line-height:1;padding:4px 10px;color:var(--mut,#a29fc4)}
+/* Telefon uchun alohida ko'rinish */
+@media(max-width:700px){
+  header{padding:10px 4vw}
+  .logo{font-size:22px}
+  nav button{padding:8px 12px;font-size:14px}
+  main{padding:20px 4vw 60px}
+  .grid{grid-template-columns:repeat(2,1fr);gap:14px}
+  .item h3{font-size:15px}
+  .ph{font-size:52px}
+  .tools{flex-direction:column}
+  .tools>*{width:100%;min-height:46px}
+  .detail{grid-template-columns:1fr;gap:20px}
+  .detail .poster{max-width:210px;margin:0 auto}
+  .land{grid-template-columns:1fr;gap:14px;min-height:0}
+  .land p{font-size:16px;margin:14px 0 22px}
+  .land .btns button{flex:1}
+  .fan{height:290px}
+  .wc{width:128px;padding:12px;border-radius:14px}
+  .wc .k{font-size:28px}
+  .feats{grid-template-columns:1fr;gap:18px;margin-top:30px}
+  .auth{grid-template-columns:1fr;width:min(400px,100%);border-radius:20px}
+  .auth-art{display:none}
+  .auth-form{padding:34px 22px 26px}
+  .m-logo{display:block;font-size:26px;margin-bottom:10px;cursor:default}
+  .auth-form input{font-size:16px}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo" id="logo">Ani<b>duble</b></div>
+  <nav id="nav"></nav>
+</header>
+<main id="app"></main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let token = localStorage.getItem('token');
+let me = null;
+let list = [];
+const filt = { q: '', genre: '', fav: false };
+
+const api = async (url, method = 'GET', body) => {
+  const r = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Xatolik yuz berdi');
+  return data;
+};
+
+const el = (tag, props = {}, ...kids) => {
+  const e = Object.assign(document.createElement(tag), props);
+  kids.flat().forEach(k => e.append(k));
+  return e;
+};
+
+function setNav() {
+  const nav = $('#nav'); nav.replaceChildren();
+  if (me) {
+    nav.append(el('span', { textContent: me.username + (me.role === 'admin' ? ' (admin)' : '') }));
+    if (me.role === 'admin') nav.append(el('button', { textContent: "Anime qo'shish", onclick: showAdd }));
+    nav.append(el('button', { textContent: 'Chiqish', onclick: logout }));
+  } else {
+    nav.append(el('button', { textContent: 'Kirish', onclick: () => showAuth('login') }));
+    nav.append(el('button', { className: 'pri', textContent: "Ro'yxatdan o'tish", onclick: () => showAuth('register') }));
+  }
+}
+
+function logout() { localStorage.removeItem('token'); token = null; me = null; setNav(); showWelcome(); }
+
+const ART = {
+  a: `<svg viewBox="0 0 200 300" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a0b4d"/><stop offset=".6" stop-color="#7a2cbf"/><stop offset="1" stop-color="#ff5c8a"/></linearGradient><linearGradient id="gs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe066"/><stop offset="1" stop-color="#ff4f81"/></linearGradient><clipPath id="cs"><circle cx="100" cy="150" r="52"/></clipPath></defs><rect width="200" height="300" fill="url(#ga)"/><g fill="#fff" opacity=".8"><circle cx="26" cy="34" r="1.3"/><circle cx="160" cy="48" r="1.3"/><circle cx="78" cy="22" r="1"/><circle cx="182" cy="96" r="1"/></g><g clip-path="url(#cs)"><rect x="40" y="95" width="120" height="110" fill="url(#gs)"/><g fill="#7a2cbf"><rect x="40" y="150" width="120" height="3"/><rect x="40" y="165" width="120" height="5"/><rect x="40" y="180" width="120" height="7"/><rect x="40" y="195" width="120" height="9"/></g></g><rect y="205" width="200" height="95" fill="#12062e"/><g stroke="#ff5c8a" stroke-width="1" opacity=".75" fill="none"><path d="M0 225H200M0 245H200M0 270H200"/><path d="M100 205L-40 300M100 205L20 300M100 205L60 300M100 205V300M100 205L140 300M100 205L180 300M100 205L240 300"/></g></svg>`,
+  b: `<svg viewBox="0 0 200 300" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="gb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1b4d"/><stop offset="1" stop-color="#1b6ca8"/></linearGradient><linearGradient id="gm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe3ef"/><stop offset="1" stop-color="#ff8fb1"/></linearGradient><pattern id="sw" width="40" height="22" patternUnits="userSpaceOnUse"><g fill="none" stroke="#9be7ff" stroke-width="1.2" opacity=".65"><circle cx="20" cy="22" r="20"/><circle cx="20" cy="22" r="13"/><circle cx="20" cy="22" r="6"/><circle cx="0" cy="0" r="20"/><circle cx="40" cy="0" r="20"/></g></pattern></defs><rect width="200" height="300" fill="url(#gb)"/><circle cx="100" cy="112" r="50" fill="url(#gm)"/><g fill="#fff" opacity=".8"><circle cx="30" cy="50" r="1.2"/><circle cx="170" cy="36" r="1.4"/><circle cx="150" cy="170" r="1"/></g><rect y="188" width="200" height="112" fill="#0f3d7a"/><rect y="188" width="200" height="112" fill="url(#sw)"/><g fill="#ffc2d9" opacity=".9"><ellipse cx="40" cy="70" rx="4" ry="2.5" transform="rotate(30 40 70)"/><ellipse cx="160" cy="120" rx="4" ry="2.5" transform="rotate(-25 160 120)"/><ellipse cx="60" cy="150" rx="3" ry="2" transform="rotate(50 60 150)"/><ellipse cx="135" cy="60" rx="3" ry="2" transform="rotate(10 135 60)"/></g></svg>`,
+  c: `<svg viewBox="0 0 200 300" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="gc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b1030"/><stop offset="1" stop-color="#4a3590"/></linearGradient><linearGradient id="gd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b2a8a"/><stop offset="1" stop-color="#120f3d"/></linearGradient><pattern id="wn" width="10" height="14" patternUnits="userSpaceOnUse"><rect x="3" y="4" width="4" height="6" fill="#ffd86b"/></pattern></defs><rect width="200" height="300" fill="url(#gc)"/><circle cx="150" cy="70" r="24" fill="#ffe9a8"/><g fill="url(#gd)"><rect x="0" y="185" width="42" height="115"/><rect x="38" y="150" width="38" height="150"/><rect x="72" y="205" width="30" height="95"/><rect x="100" y="120" width="46" height="180"/><rect x="144" y="180" width="30" height="120"/><rect x="170" y="160" width="30" height="140"/></g><g fill="url(#wn)" opacity=".75"><rect x="0" y="185" width="42" height="115"/><rect x="38" y="150" width="38" height="150"/><rect x="100" y="120" width="46" height="180"/><rect x="170" y="160" width="30" height="140"/></g><g stroke-width="2" stroke-linecap="round"><path d="M38 150H76" stroke="#5ef0ff"/><path d="M100 120H146" stroke="#ff5c8a"/><path d="M170 160H200" stroke="#5ef0ff"/></g><rect x="118" y="96" width="4" height="24" fill="#ff5c8a"/></svg>`,
+};
+
+function showWelcome() {
+  const wc = (cls, kana, label) => {
+    const pic = el('div', { className: 'art' });
+    pic.innerHTML = ART[cls];
+    return el('div', { className: 'wc ' + cls }, pic, el('span', { className: 'k', textContent: kana }), el('b', { textContent: label }));
+  };
+  const feat = (t, d) => el('div', {}, el('b', { textContent: t }), el('span', { textContent: d }));
+  $('#app').replaceChildren(
+    el('section', { className: 'land' },
+      el('div', {},
+        el('h1', { textContent: 'Animeni qulay tomosha qiling' }),
+        el('p', { textContent: "Qismlar, sevimlilar va izohlar bir joyda. Boshlash uchun akauntga kiring yoki yangisini oching." }),
+        el('div', { className: 'btns' },
+          el('button', { className: 'pri', textContent: 'Kirish', onclick: () => showAuth('login') }),
+          el('button', { textContent: "Ro'yxatdan o'tish", onclick: () => showAuth('register') }))),
+      el('div', { className: 'fan' }, wc('a', 'ア', '1-qism'), wc('b', 'ニ', '2-qism'), wc('c', 'メ', '3-qism'))),
+    el('div', { className: 'feats' },
+      feat("Qism-qism ko'ring", "Har bir serial qismlarga bo'lingan, kerakli qismni tanlaysiz."),
+      feat('Sevimlilar', "Yoqqan animelaringizni bir bosishda saqlab qo'ying."),
+      feat('Izohlar', "Ko'rganlaringiz haqida fikringizni yozing.")));
+}
+
+function field(label, name, type = 'text', area = false) {
+  const input = area ? el('textarea', { name, rows: 4 }) : el('input', { name, type });
+  return el('div', {}, el('label', { textContent: label }), input);
+}
+
+function closeAuth() { const o = $('#ov'); if (o) o.remove(); document.body.style.overflow = ''; }
+document.addEventListener('keydown', (e) => e.key === 'Escape' && closeAuth());
+
+function showAuth(mode) {
+  closeAuth();
+  const reg = mode === 'register';
+  const err = el('div', { className: 'err' });
+  const u = el('input', { autocomplete: 'username', placeholder: 'Loginingiz' });
+  const p = el('input', { type: 'password', autocomplete: reg ? 'new-password' : 'current-password', placeholder: 'Parolingiz' });
+  const submit = async () => {
+    try {
+      const d = await api(reg ? '/api/register' : '/api/login', 'POST', { username: u.value, password: p.value });
+      token = d.token; localStorage.setItem('token', token);
+      me = await api('/api/me'); closeAuth(); setNav(); showList();
+    } catch (e) { err.textContent = e.message; }
+  };
+  u.onkeydown = (e) => e.key === 'Enter' && p.focus();
+  p.onkeydown = (e) => e.key === 'Enter' && submit();
+  const tab = (m, t) => el('button', { className: 'tab' + (m === mode ? ' on' : ''), textContent: t, onclick: () => showAuth(m) });
+  const ov = el('div', { id: 'ov', className: 'overlay', onclick: (e) => e.target === ov && closeAuth() },
+    el('div', { className: 'auth' },
+      el('div', { className: 'auth-art' },
+        el('div', { className: 'logo' }, 'Ani', el('b', { textContent: 'duble' })),
+        el('p', { textContent: "Sevimli animelaringiz bir joyda. Kiring va yangi qismlarni tomosha qiling." })),
+      el('div', { className: 'auth-form' },
+        el('button', { className: 'x', textContent: '×', title: 'Yopish', onclick: closeAuth }),
+        el('div', { className: 'logo m-logo' }, 'Ani', el('b', { textContent: 'duble' })),
+        el('div', { className: 'tabs' }, tab('login', 'Kirish'), tab('register', "Ro'yxatdan o'tish")),
+        el('h2', { textContent: reg ? 'Akaunt yaratish' : 'Xush kelibsiz!' }),
+        el('p', { className: 'sub', textContent: reg ? "Login va parol o'ylab toping." : 'Login va parolingizni kiriting.' }),
+        el('label', { textContent: 'Login' }), u,
+        el('label', { textContent: 'Parol' }), p, err,
+        el('button', { className: 'pri go', textContent: reg ? "Ro'yxatdan o'tish" : 'Kirish', onclick: submit }))));
+  document.body.append(ov);
+  document.body.style.overflow = 'hidden';
+  u.focus();
+}
+
+function showAdd() {
+  const err = el('div', { className: 'err' });
+  const form = el('div', { className: 'form center' },
+    el('h2', { textContent: "Yangi anime qo'shish" }),
+    field('Nomi', 'title'), field('Janr (vergul bilan: Action, Drama)', 'genre'), field('Yil', 'year', 'number'),
+    field('Tavsif', 'description', 'text', true),
+    field('Poster rasmi havolasi (https://...)', 'poster'),
+    field("Video havolasi (ixtiyoriy, qismlarni keyin qo'shasiz)", 'video'), err,
+    el('button', { className: 'pri', textContent: "Qo'shish", onclick: async () => {
+      const g = (n) => form.querySelector(`[name=${n}]`).value;
+      try {
+        await api('/api/anime', 'POST', { title: g('title'), genre: g('genre'), year: g('year'),
+          description: g('description'), poster: g('poster'), video: g('video') });
+        showList();
+      } catch (e) { err.textContent = e.message; }
+    } })
+  );
+  $('#app').replaceChildren(form);
+}
+
+const poster = (a) => {
+  const p = el('div', { className: 'poster' });
+  if (a.poster) p.style.backgroundImage = `url("${a.poster.replace(/"/g, '%22')}")`;
+  else p.append(el('span', { className: 'ph', textContent: (a.title || '?').trim().charAt(0).toUpperCase() }));
+  if (a.year) p.append(el('span', { className: 'chip', textContent: a.year }));
+  return p;
+};
+
+async function loadList() { list = await api('/api/anime'); }
+
+async function showList() {
+  if (!me) return showWelcome();
+  try { await loadList(); } catch { return logout(); }
+  const genres = [...new Set(list.flatMap(a => (a.genre || '').split(',').map(s => s.trim()).filter(Boolean)))];
+  const box = el('div');
+  const draw = () => {
+    const q = filt.q.toLowerCase();
+    const items = list.filter(a =>
+      (!q || a.title.toLowerCase().includes(q)) &&
+      (!filt.genre || (a.genre || '').split(',').map(s => s.trim()).includes(filt.genre)) &&
+      (!filt.fav || (me.favs || []).includes(a.id)));
+    if (!items.length) {
+      box.replaceChildren(el('div', { className: 'empty', textContent: list.length
+        ? 'Hech narsa topilmadi.'
+        : (me.role === 'admin' ? "Hali anime yo'q. «Anime qo'shish» tugmasi bilan birinchisini qo'shing." : "Hali anime qo'shilmagan.") }));
+      return;
+    }
+    box.replaceChildren(el('div', { className: 'grid' }, items.map(a =>
+      el('div', { className: 'item', tabIndex: 0, onclick: () => showDetail(a.id), onkeydown: (e) => e.key === 'Enter' && showDetail(a.id) },
+        poster(a), el('h3', { textContent: a.title }), el('small', { textContent: [a.genre, a.year].filter(Boolean).join(', ') })))));
+  };
+  const favBtn = el('button', { textContent: 'Sevimlilar', className: filt.fav ? 'pri' : '', onclick: () => {
+    filt.fav = !filt.fav; favBtn.classList.toggle('pri', filt.fav); draw(); } });
+  $('#app').replaceChildren(
+    el('div', { className: 'tools' },
+      el('input', { type: 'search', placeholder: 'Anime qidirish...', value: filt.q, oninput: (e) => { filt.q = e.target.value; draw(); } }),
+      el('select', { onchange: (e) => { filt.genre = e.target.value; draw(); } },
+        el('option', { value: '', textContent: 'Barcha janrlar' }),
+        genres.map(x => el('option', { value: x, textContent: x, selected: x === filt.genre }))),
+      favBtn),
+    box);
+  draw();
+}
+
+function playerFor(url) {
+  const yt = url.match(/(?:youtu\.be\/|v=|embed\/)([\w-]{11})/);
+  if (yt) return el('iframe', { className: 'player', src: 'https://www.youtube.com/embed/' + yt[1], allowFullscreen: true });
+  return el('video', { className: 'player', src: url, controls: true });
+}
+
+async function showDetail(id) {
+  try { await loadList(); } catch { return logout(); }
+  const a = list.find(x => x.id === id);
+  if (!a) return showList();
+  const eps = a.episodes || [];
+  const isAdmin = me.role === 'admin';
+  const pl = el('div');
+  const play = (url, btn) => {
+    pl.replaceChildren(playerFor(url));
+    document.querySelectorAll('.eps .ep').forEach(b => b.classList.toggle('on', b === btn));
+  };
+
+  const epBox = el('div', { className: 'eps' }, eps.map(e => {
+    const b = el('button', { className: 'ep', textContent: e.title, onclick: () => play(e.video, b) });
+    const w = el('span', {}, b);
+    if (isAdmin) w.append(el('button', { className: 'del', textContent: '×', title: "Qismni o'chirish", onclick: async () => {
+      if (confirm("Bu qismni o'chirasizmi?")) { await api(`/api/anime/${id}/episodes/${e.id}`, 'DELETE'); showDetail(id); }
+    } }));
+    return w;
+  }));
+
+  const fav = el('button', { onclick: async () => { me.favs = (await api(`/api/anime/${id}/fav`, 'POST')).favs; paintFav(); } });
+  const paintFav = () => {
+    const on = (me.favs || []).includes(id);
+    fav.textContent = on ? 'Sevimlilardan olib tashlash' : "Sevimlilarga qo'shish";
+    fav.classList.toggle('pri', on);
+  };
+  paintFav();
+
+  const bar = el('div', { className: 'bar' }, el('button', { textContent: 'Orqaga', onclick: showList }));
+  if (isAdmin) bar.append(el('button', { className: 'del', textContent: "Animeni o'chirish", onclick: async () => {
+    if (confirm("Bu animeni o'chirasizmi?")) { await api('/api/anime/' + id, 'DELETE'); showList(); }
+  } }));
+
+  let adm = '';
+  if (isAdmin) {
+    const t = el('input', { placeholder: 'Qism nomi (masalan, 1-qism)' });
+    const v = el('input', { placeholder: 'Video havolasi (https://...)' });
+    const err = el('div', { className: 'err' });
+    adm = el('div', { className: 'form sec' }, el('h3', { textContent: "Yangi qism qo'shish" }), t, v, err,
+      el('button', { className: 'pri', textContent: "Qism qo'shish", onclick: async () => {
+        try { await api(`/api/anime/${id}/episodes`, 'POST', { title: t.value, video: v.value }); showDetail(id); }
+        catch (e) { err.textContent = e.message; }
+      } }));
+  }
+
+  const cbox = el('div');
+  const loadComments = async () => {
+    const cs = await api(`/api/anime/${id}/comments`);
+    cbox.replaceChildren(...(cs.length ? cs.map(c => {
+      const row = el('div', { className: 'cm' },
+        el('small', { textContent: c.username + ', ' + new Date(c.created).toLocaleDateString() }),
+        el('div', { textContent: c.text }));
+      if (c.username === me.username || isAdmin) row.append(el('button', { className: 'del', textContent: "O'chirish", onclick: async () => {
+        await api('/api/comments/' + c.id, 'DELETE'); loadComments(); } }));
+      return row;
+    }) : [el('div', { className: 'empty', textContent: "Hali izoh yo'q. Birinchi bo'lib yozing." })]));
+  };
+  const ta = el('textarea', { rows: 3, maxLength: 500, placeholder: 'Izoh yozing...', style: 'width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line,#2e2a58);background:var(--card,#1a1735)' });
+  const cerr = el('div', { className: 'err' });
+  const comments = el('div', { className: 'sec' }, el('h3', { textContent: 'Izohlar' }), ta, cerr,
+    el('button', { className: 'pri', textContent: 'Yuborish', onclick: async () => {
+      try { await api(`/api/anime/${id}/comments`, 'POST', { text: ta.value }); ta.value = ''; cerr.textContent = ''; loadComments(); }
+      catch (e) { cerr.textContent = e.message; }
+    } }), cbox);
+
+  $('#app').replaceChildren(bar, el('div', { className: 'detail' }, poster(a),
+    el('div', {}, el('h2', { textContent: a.title }),
+      el('p', { textContent: [a.genre, a.year].filter(Boolean).join(', '), style: 'color:var(--mut,#a29fc4)' }),
+      el('p', { textContent: a.description }), fav,
+      epBox, pl)), adm, comments);
+
+  const first = epBox.querySelector('.ep');
+  if (first) first.click();
+  else if (a.video) play(a.video);
+  else pl.append(el('p', { className: 'empty', textContent: "Video hali qo'shilmagan." }));
+  loadComments();
+}
+
+$('#logo').onclick = showList;
+(async () => {
+  if (token) { try { me = await api('/api/me'); } catch { logout(); return; } }
+  setNav(); showList();
+})();
+</script>
+</body>
+</html>

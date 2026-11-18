@@ -88,7 +88,7 @@ main{padding:30px 5vw 70px;max-width:1240px;margin:auto}
 .auth-art{position:relative;background:#1b1840;color:#fff;padding:40px 34px;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;min-height:440px;overflow:hidden}
 .auth-art .logo{font-size:34px;cursor:default}
 .auth-art p{margin:0;opacity:.8;max-width:260px}
-.auth-art::after{content:'アニメ';position:absolute;top:18px;right:22px;writing-mode:vertical-rl;font-size:76px;font-weight:800;opacity:.12;line-height:1}
+.auth-art::after{content:'\30A2\30CB\30E1';position:absolute;top:18px;right:22px;writing-mode:vertical-rl;font-size:76px;font-weight:800;opacity:.12;line-height:1}
 .auth-form{position:relative;padding:40px 36px;display:flex;flex-direction:column;justify-content:center}
 .auth-form h2{font-size:28px;margin-bottom:4px}
 .auth-form .sub{color:var(--mut,#a29fc4);margin:0 0 16px}
@@ -177,7 +177,7 @@ const el = (tag, props = {}, ...kids) => {
 function setNav() {
   const nav = $('#nav'); nav.replaceChildren();
   if (me) {
-    nav.append(el('span', { textContent: me.username + (me.role === 'admin' ? ' (admin)' : '') }),
+    nav.append(el('span', { textContent: me.username + (me.owner ? ' (bosh admin)' : me.role === 'admin' ? ' (admin)' : '') }),
       el('button', { textContent: 'Sevimlilar', onclick: () => { filt.fav = true; showList(); } }));
     if (me.role === 'admin') nav.append(
       el('button', { textContent: "Anime qo'shish", onclick: () => showAdd() }),
@@ -212,7 +212,7 @@ function showWelcome() {
         el('div', { className: 'btns' },
           el('button', { className: 'pri', textContent: 'Kirish', onclick: () => showAuth('login') }),
           el('button', { textContent: "Ro'yxatdan o'tish", onclick: () => showAuth('register') }))),
-      el('div', { className: 'fan' }, wc('a', '侍', 'Samuray'), wc('b', '剣', 'Ronin'), wc('c', '刀', 'Qilichboz'))),
+      el('div', { className: 'fan' }, wc('a', '\u4f8d', 'Samuray'), wc('b', '\u5263', 'Ronin'), wc('c', '\u5200', 'Qilichboz'))),
     el('div', { className: 'feats' },
       feat("Qism-qism ko'ring", "Har bir serial qismlarga bo'lingan, kerakli qismni tanlaysiz."),
       feat('Sevimlilar', "Yoqqan animelaringizni bir bosishda saqlab qo'ying."),
@@ -249,7 +249,7 @@ function showAuth(mode) {
         el('div', { className: 'logo' }, 'Ani', el('b', { textContent: 'duble' })),
         el('p', { textContent: "Sevimli animelaringiz bir joyda. Kiring va yangi qismlarni tomosha qiling." })),
       el('div', { className: 'auth-form' },
-        el('button', { className: 'x', textContent: '×', title: 'Yopish', onclick: closeAuth }),
+        el('button', { className: 'x', textContent: '\u00d7', title: 'Yopish', onclick: closeAuth }),
         el('div', { className: 'logo m-logo' }, 'Ani', el('b', { textContent: 'duble' })),
         el('div', { className: 'tabs' }, tab('login', 'Kirish'), tab('register', "Ro'yxatdan o'tish")),
         el('h2', { textContent: reg ? 'Akaunt yaratish' : 'Xush kelibsiz!' }),
@@ -263,7 +263,7 @@ function showAuth(mode) {
 }
 
 async function showAdminPanel(tab = 'stats') {
-  const tabs = [['stats', 'Statistika'], ['users', 'Foydalanuvchilar'], ['comments', 'Izohlar'], ['genres', 'Janrlar'], ['new', 'Yangi admin']];
+  const tabs = [['stats', 'Statistika'], ['users', 'Foydalanuvchilar'], ['comments', 'Izohlar'], ['genres', 'Janrlar'], ['new', 'Yangi admin']].filter(([k]) => k !== 'new' || me.owner);
   const body = el('div', { style: 'max-width:760px' });
   const stat = (l, n) => el('div', { className: 'stat' }, el('b', { textContent: String(n) }), el('span', { textContent: l }));
   const run = (fn) => async () => { try { await fn(); } catch (e) { alert(e.message); } };
@@ -279,17 +279,17 @@ async function showAdminPanel(tab = 'stats') {
       const us = await api('/api/admin/users');
       body.append(...us.map(u => el('div', { className: 'cm urow' },
         el('div', {}, el('b', { textContent: u.username }),
-          el('small', { textContent: (u.role === 'admin' ? ' (admin)' : '') + ' · ' + (u.created ? new Date(u.created).toLocaleDateString() : '-') + ' · sevimli: ' + u.favs })),
-        u.username === me.username ? '' : el('div', { className: 'btns2' },
-          el('button', { textContent: u.role === 'admin' ? 'Adminlikni olish' : 'Admin qilish', onclick: run(async () => {
+          el('small', { textContent: (u.owner ? ' (bosh admin)' : u.role === 'admin' ? ' (admin)' : '') + ' \u00b7 ' + (u.created ? new Date(u.created).toLocaleDateString() : '-') + ' \u00b7 sevimli: ' + u.favs })),
+        (u.username === me.username || u.owner) ? '' : el('div', { className: 'btns2' },
+          el('button', { hidden: !me.owner, textContent: u.role === 'admin' ? 'Adminlikni olish' : 'Admin qilish', onclick: run(async () => {
             await api(`/api/admin/users/${u.id}/role`, 'POST', { role: u.role === 'admin' ? 'user' : 'admin' }); showAdminPanel('users'); }) }),
-          el('button', { className: 'del', textContent: "O'chirish", onclick: run(async () => {
+          el('button', { className: 'del', hidden: !(me.owner || u.role !== 'admin'), textContent: "O'chirish", onclick: run(async () => {
             if (confirm(u.username + " akauntini o'chirasizmi? Izohlari ham o'chadi.")) { await api('/api/admin/users/' + u.id, 'DELETE'); showAdminPanel('users'); } }) })))));
     } else if (tab === 'comments') {
       const cs = await api('/api/admin/comments');
       if (!cs.length) body.append(el('div', { className: 'empty', textContent: "Hali izoh yo'q." }));
       body.append(...cs.map(c => el('div', { className: 'cm urow' },
-        el('div', {}, el('small', { textContent: c.username + ' · ' + c.anime + ' · ' + new Date(c.created).toLocaleDateString() }), el('div', { textContent: c.text })),
+        el('div', {}, el('small', { textContent: c.username + ' \u00b7 ' + c.anime + ' \u00b7 ' + new Date(c.created).toLocaleDateString() }), el('div', { textContent: c.text })),
         el('button', { className: 'del', textContent: "O'chirish", onclick: run(async () => { await api('/api/comments/' + c.id, 'DELETE'); showAdminPanel('comments'); }) }))));
     } else if (tab === 'genres') {
       const gs = await api('/api/genres');
@@ -384,7 +384,7 @@ async function showList() {
     if (!items.length) {
       box.replaceChildren(el('div', { className: 'empty', textContent: list.length
         ? (filt.fav ? "Hali sevimli anime yo'q. Kartochkadagi yurak belgisini bosing." : 'Hech narsa topilmadi.')
-        : (me.role === 'admin' ? "Hali anime yo'q. «Anime qo'shish» tugmasi bilan birinchisini qo'shing." : "Hali anime qo'shilmagan.") }));
+        : (me.role === 'admin' ? "Hali anime yo'q. \u00abAnime qo'shish\u00bb tugmasi bilan birinchisini qo'shing." : "Hali anime qo'shilmagan.") }));
       return;
     }
     box.replaceChildren(el('div', { className: 'grid' }, items.map(a =>
@@ -428,7 +428,7 @@ async function showDetail(id) {
   const epBox = el('div', { className: 'eps' }, eps.map(e => {
     const b = el('button', { className: 'ep', textContent: e.title, onclick: () => play(e.video, b) });
     const w = el('span', {}, b);
-    if (isAdmin) w.append(el('button', { className: 'del', textContent: '×', title: "Qismni o'chirish", onclick: async () => {
+    if (isAdmin) w.append(el('button', { className: 'del', textContent: '\u00d7', title: "Qismni o'chirish", onclick: async () => {
       if (confirm("Bu qismni o'chirasizmi?")) { await api(`/api/anime/${id}/episodes/${e.id}`, 'DELETE'); showDetail(id); }
     } }));
     return w;

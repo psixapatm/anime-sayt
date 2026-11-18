@@ -30,10 +30,12 @@ function auth(req, res, next) {
   try { p = jwt.verify(t, SECRET); } catch { return res.status(401).json({ error: 'Avval tizimga kiring' }); }
   users.findOne({ id: p.id }).then(u => {
     if (!u) return res.status(401).json({ error: 'Avval tizimga kiring' });
-    req.user = { id: u.id, username: u.username, role: u.role };
+    req.user = { id: u.id, username: u.username, role: u.role, owner: u.lower === ADMIN_USER.toLowerCase() };
     next();
   }).catch(() => res.status(500).json({ error: 'Server xatosi' }));
 }
+const ownerOnly = (req, res, next) =>
+  req.user.owner ? next() : res.status(403).json({ error: 'Bu amal faqat bosh admin uchun' });
 const admin = (req, res, next) =>
   req.user.role === 'admin' ? next() : res.status(403).json({ error: 'Faqat admin uchun' });
 
@@ -65,7 +67,7 @@ app.post('/api/login', wrap(async (req, res) => {
 app.get('/api/me', auth, wrap(async (req, res) => {
   const u = await users.findOne({ id: req.user.id });
   if (!u) return res.status(401).json({ error: 'Avval tizimga kiring' });
-  res.json({ username: u.username, role: u.role, favs: u.favs || [] });
+  res.json({ username: u.username, role: u.role, favs: u.favs || [], owner: u.lower === ADMIN_USER.toLowerCase() });
 }));
 
 app.get('/api/anime', auth, wrap(async (req, res) => {
@@ -168,9 +170,9 @@ app.get('/api/admin/stats', auth, admin, wrap(async (req, res) => {
 }));
 app.get('/api/admin/users', auth, admin, wrap(async (req, res) => {
   const list = await users.find({}, { projection: { _id: 0 } }).sort({ created: -1 }).toArray();
-  res.json(list.map(u => ({ id: u.id, username: u.username, role: u.role, created: u.created || null, favs: (u.favs || []).length })));
+  res.json(list.map(u => ({ id: u.id, username: u.username, role: u.role, created: u.created || null, favs: (u.favs || []).length, owner: u.lower === ADMIN_USER.toLowerCase() })));
 }));
-app.post('/api/admin/users', auth, admin, wrap(async (req, res) => {
+app.post('/api/admin/users', auth, ownerOnly, wrap(async (req, res) => {
   const username = String(req.body.username || '').trim();
   const password = String(req.body.password || '');
   if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) return res.status(400).json({ error: "Login 3-20 ta harf, raqam yoki _ bo'lishi kerak" });
@@ -184,7 +186,7 @@ app.post('/api/admin/users', auth, admin, wrap(async (req, res) => {
   }
   res.json({ ok: true });
 }));
-app.post('/api/admin/users/:id/role', auth, admin, wrap(async (req, res) => {
+app.post('/api/admin/users/:id/role', auth, ownerOnly, wrap(async (req, res) => {
   if (req.params.id === req.user.id) return res.status(400).json({ error: "O'zingizning huquqingizni o'zgartira olmaysiz" });
   const role = req.body.role === 'admin' ? 'admin' : 'user';
   await users.updateOne({ id: req.params.id }, { $set: { role } });
@@ -192,6 +194,10 @@ app.post('/api/admin/users/:id/role', auth, admin, wrap(async (req, res) => {
 }));
 app.delete('/api/admin/users/:id', auth, admin, wrap(async (req, res) => {
   if (req.params.id === req.user.id) return res.status(400).json({ error: "O'zingizni o'chira olmaysiz" });
+  const target = await users.findOne({ id: req.params.id });
+  if (!target) return res.json({ ok: true });
+  if (target.lower === ADMIN_USER.toLowerCase()) return res.status(403).json({ error: "Bosh adminni o'chirib bo'lmaydi" });
+  if (target.role === 'admin' && !req.user.owner) return res.status(403).json({ error: "Adminlarni faqat bosh admin o'chira oladi" });
   await users.deleteOne({ id: req.params.id });
   await comments.deleteMany({ userId: req.params.id });
   res.json({ ok: true });

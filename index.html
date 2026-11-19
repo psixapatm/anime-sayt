@@ -176,7 +176,7 @@ let token = localStorage.getItem('token');
 let me = null;
 let list = [];
 const filt = { q: '', genre: '', fav: false, sort: 'new' };
-const TG = 'https://t.me/eclipe_nyx';
+const TG = 'https://t.me/eclipse_nyx';
 const tgLink = (label) => el('a', { className: 'btn pri', href: TG, target: '_blank', rel: 'noopener', textContent: label || 'Telegram: @eclipse_nyx' });
 
 const api = async (url, method = 'GET', body) => {
@@ -329,7 +329,7 @@ async function showPlans(msg = '') {
   if (!ts.length && !me.pro) cards.push(plan('Pro', "Narx uchun bog'laning", ['Barcha darslar, jumladan Pro darslar'], false, tgLink()));
   $('#app').replaceChildren(el('h2', { textContent: 'Obuna', style: 'margin-bottom:16px' }),
     el('div', { className: 'plans' }, cards),
-    el('p', { className: 'sub', style: 'margin:18px 0' }, "Pro obuna sotib olish uchun Telegram orqali bog'laning va tarif nomini yozing: ", tgLink('@eclipe_nyx')),
+    el('p', { className: 'sub', style: 'margin:18px 0' }, "Pro obuna sotib olish uchun Telegram orqali bog'laning va tarif nomini yozing: ", tgLink('@eclipse_nyx')),
     el('div', { className: 'form sec' }, el('h3', { textContent: 'Promo kod' }),
       el('p', { className: 'sub', textContent: "Promo kodingiz bo'lsa, shu yerga yozing va Pro obunani oling." }), code, err,
       el('button', { className: 'pri', textContent: 'Faollashtirish', onclick: async () => {

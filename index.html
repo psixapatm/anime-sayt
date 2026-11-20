@@ -2,7 +2,6 @@
 
 
 
-
 <!DOCTYPE html>
 <html lang="uz">
 <head>
@@ -217,6 +216,8 @@ input,textarea,select{border-radius:12px}
 .question-editor{border:1px solid var(--line);background:var(--bg);border-radius:17px;padding:16px;margin:12px 0}.question-editor-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.question-editor textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);resize:vertical}.question-editor>label{display:block;font-size:12px;color:var(--mut);font-weight:800;margin:14px 0 7px}.answer-editor{display:grid;gap:8px}.answer-line{display:grid;grid-template-columns:38px 1fr 32px;gap:8px;align-items:center}.answer-line input{width:100%;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:var(--card);color:var(--ink)}.correct-pick{width:36px;height:36px;min-height:36px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--mut);box-shadow:none}.correct-pick.on{background:var(--acc);border-color:var(--acc);color:#fff}.remove-option,.remove-question{border:0;background:transparent;color:var(--mut);box-shadow:none;padding:5px}.remove-option{font-size:20px}.remove-question{font-size:12px}.add-option,.add-question,.builder-cancel{background:transparent;border:1px dashed var(--line);color:var(--acc);box-shadow:none;padding:9px 13px;margin-top:10px}.add-option{font-size:12px;min-height:34px}.add-question{width:100%;border-color:color-mix(in srgb,var(--acc) 50%,var(--line));border-radius:12px}.builder-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.builder-actions .pri{padding:12px 20px}.builder-cancel{border-style:solid;color:var(--mut);margin-top:0}.test-admin-card{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:15px 0;border-top:1px solid var(--line)}.test-admin-info{min-width:0}.test-admin-title{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.test-admin-info small{display:block;color:var(--mut);margin-top:5px}.test-status{font-size:10px;font-weight:800;border-radius:999px;padding:4px 9px}.test-status.active{color:#15966b;background:rgba(21,150,107,.12)}.test-status.inactive{color:var(--mut);background:var(--bg)}.test-admin-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.test-admin-actions button{font-size:12px;padding:8px 11px;min-height:35px}.remove-question:disabled{opacity:.25;cursor:not-allowed}
 @media(max-width:700px){.builder-fields{grid-template-columns:1fr}.test-admin-card{align-items:flex-start;flex-direction:column}.test-admin-actions{justify-content:flex-start}.profile-head{gap:13px}.profile-symbol{width:60px;height:60px;flex-basis:60px}.badge-picker{gap:7px}.badge-choice{min-width:62px}.question-editor{padding:12px}}
 
+
+.test-result{text-align:center;max-width:720px;margin:28px auto;padding:30px}.test-score{font:800 clamp(48px,9vw,76px) 'Bricolage Grotesque',sans-serif;color:var(--acc2);margin:12px}.test-result-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:22px}.test-result-actions button{min-width:190px}.profile-card input:disabled{opacity:.7;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -395,13 +396,13 @@ function showAuth(mode) {
 async function showProfile() {
   try { me = await api('/api/me'); } catch { return logout(); }
   const recentBox = el('div', { className: 'profile-grid' });
-  const name = el('input', { value: me.profileName || '', placeholder: 'Ism va familiyangiz (sertifikat uchun)', maxLength: 80 });
+  const name = el('input', { value: me.profileName || '', placeholder: 'Ism va familiyangiz (sertifikat uchun)', maxLength: 80, disabled: !!me.profileName && !!me.profileNameEditUsed });
   let selectedBadge = me.badge || 'none';
   const badge = el('div',{className:'badge-picker'});
   const badgeItems=[['none','<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.5 3.1-5.3 7-5.3s6.3 1.8 7 5.3"/></svg>','Oddiy'],['crown','👑','Toj'],['star','✦','Yulduz'],['fire','♨','Olov'],['diamond','◆','Olmos'],['code','</>','Kod']];
   const drawBadges=()=>{badge.replaceChildren(...badgeItems.map(([v,ico,label])=>el('button',{type:'button',className:'badge-choice'+(selectedBadge===v?' selected':''),disabled:!me.pro&&v!=='none',title:label,innerHTML:'<span class="badge-orb">'+ico+'</span><small>'+label+'</small>',onclick:()=>{selectedBadge=v;drawBadges();}})));};drawBadges();
   const status = el('div',{className:'sub'});
-  const save = el('button',{className:'pri',textContent:'Profilni saqlash',onclick:async()=>{try{await api('/api/profile','PUT',{profileName:name.value,badge:selectedBadge});me=await api('/api/me');status.textContent='Profil saqlandi.';setNav();}catch(e){status.textContent=e.message;}}});
+  const save = el('button',{className:'pri',textContent:'Profilni saqlash',onclick:async()=>{try{await api('/api/profile','PUT',{profileName:name.value,badge:selectedBadge});me=await api('/api/me');status.textContent='Profil saqlandi.';showProfile();setNav();}catch(e){status.textContent=e.message;}}});
   const proUntil = me.pro && me.proUntil ? new Date(me.proUntil).toLocaleDateString() : 'Faol emas';
   const avatarBadge=badgeItems.find(x=>x[0]===(me.badge||'none'))||badgeItems[0];
   const head = el('section',{className:'profile-card profile-head'},el('div',{className:'profile-symbol',innerHTML:avatarBadge[0]==='none'?'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.5 3.1-5.3 7-5.3s6.3 1.8 7 5.3"/></svg>':avatarBadge[1]}),el('div',{},el('h2',{textContent:me.profileName||me.username}),el('p',{className:'sub',textContent:'@'+me.username}),el('span',{className:me.pro?'profile-pro':'profile-free',textContent:me.pro?'PRO OBUNA':'ODDIY FOYDALANUVCHI'})));
@@ -414,9 +415,18 @@ async function showProfile() {
   testsBox.append(...(testRows.length?testRows.map(t=>el('button',{textContent:'📝 '+t.title+' — '+t.courseTitle,onclick:()=>takeTest(t.id)})):[el('p',{className:'sub',textContent:'Hozircha sertifikat testlari mavjud emas.'})]));
   const certBox=el('div',{className:'profile-grid'});
   (me.certificates||[]).forEach(c=>certBox.append(el('button',{textContent:'🏅 '+c.courseTitle+' · '+c.fullName,onclick:()=>printCertificate(c)})));
+
+  const newLogin=el('input',{placeholder:'Yangi login (ixtiyoriy)',value:'',maxLength:20,autocomplete:'username'});
+  const newPassword=el('input',{placeholder:'Yangi parol (ixtiyoriy)',value:'',type:'password',autocomplete:'new-password'});
+  const codeInput=el('input',{placeholder:'Telegramdan kelgan 6 xonali kod',inputMode:'numeric',maxLength:6});
+  const accountStatus=el('p',{className:'sub',textContent:'Login yoki parolni o‘zgartirish uchun Telegram orqali tasdiqlash talab qilinadi.'});
+  const sendCode=el('button',{className:'pri',textContent:'Telegramga tasdiqlash kodini yuborish',onclick:async()=>{try{const r=await api('/api/account/change/start','POST',{username:newLogin.value.trim(),password:newPassword.value});accountStatus.textContent=r.message;codeInput.focus();}catch(e){accountStatus.textContent=e.message;}}});
+  const confirmChange=el('button',{textContent:'Kodni tasdiqlash va saqlash',onclick:async()=>{try{const r=await api('/api/account/change/verify','POST',{code:codeInput.value});accountStatus.textContent=r.message+' Yangi login: '+r.username;newLogin.value='';newPassword.value='';codeInput.value='';me=await api('/api/me');setNav();}catch(e){accountStatus.textContent=e.message;}}});
+
   $('#app').replaceChildren(head,
     el('section',{className:'profile-card'},el('h3',{textContent:'Obuna holati'}),el('p',{textContent:me.pro?'Pro obunangiz '+proUntil+' gacha faol.':'Sizda hozircha Pro obuna yo‘q.'}),el('button',{className:'pri',textContent:'Obunani boshqarish',onclick:()=>showPlans()})),
-    el('section',{className:'profile-card'},el('h3',{textContent:'Profil imkoniyatlari'}),el('label',{textContent:'Sertifikatda ko‘rinadigan ism-familiya'}),name,el('label',{textContent:'Profil belgisi'+(me.pro?'':' (Pro obuna uchun)')}),badge,save,status),
+    el('section',{className:'profile-card'},el('h3',{textContent:'Profil imkoniyatlari'}),el('label',{textContent:'Sertifikatda ko‘rinadigan ism-familiya'}),name,me.profileNameEditUsed?el('p',{className:'sub',textContent:'Ism-familiyani tahrirlash imkoniyati ishlatilgan.'}):el('p',{className:'sub',textContent:me.profileName?'Zarur bo‘lsa, uni yana bir marta o‘zgartirishingiz mumkin.':'Ism-familiyangizni bir marta saqlang.'}),el('label',{textContent:'Profil belgisi'+(me.pro?'':' (Pro obuna uchun)')}),badge,save,status),
+    el('section',{className:'profile-card'},el('h3',{textContent:'Login va parolni almashtirish'}),el('label',{textContent:'Yangi login'}),newLogin,el('label',{textContent:'Yangi parol'}),newPassword,sendCode,el('label',{textContent:'Tasdiqlash kodi'}),codeInput,confirmChange,accountStatus),
     el('section',{className:'profile-card'},el('h3',{textContent:'Oxirgi ko‘rilgan 5 ta kurs'}),recentBox),
     el('section',{className:'profile-card'},el('h3',{textContent:'Sertifikat olish uchun test'}),testsBox),
     el('section',{className:'profile-card'},el('h3',{textContent:'Mening sertifikatlarim'}),certBox));
@@ -425,10 +435,26 @@ async function takeTest(id){
   try{
     const t=await api('/api/tests/'+id);const answers={};const nodes=[el('h2',{textContent:t.title}),el('p',{className:'sub',textContent:'Kurs: '+t.courseTitle})];
     t.questions.forEach((q,i)=>{const group=el('div',{className:'profile-card'},el('b',{textContent:(i+1)+'. '+q.text}));q.options.forEach((o,j)=>{const lab=el('label',{className:'test-option'});const radio=el('input',{type:'radio',name:q.id,value:String(j)});radio.onchange=()=>answers[q.id]=j;lab.append(radio,document.createTextNode(' '+o));group.append(lab);});nodes.push(group);});
-    nodes.push(el('button',{className:'pri',textContent:'Testni yakunlash',onclick:async()=>{try{const r=await api('/api/tests/'+id+'/submit','POST',{answers});const out=el('div',{className:'profile-card'},el('h3',{textContent:`Natija: ${r.correct}/${r.total} — ${r.percent}%`}),el('p',{textContent:r.passed?'Tabriklaymiz! Testdan muvaffaqiyatli o‘tdingiz.':'Afsus, kerakli natijaga yetmadingiz.'}));if(r.passed){const fn=el('input',{placeholder:'Sertifikat uchun ism-familiyangiz'});out.append(fn,el('button',{className:'pri',textContent:'Sertifikat yaratish',onclick:async()=>{try{const cert=await api('/api/certificates','POST',{fullName:fn.value,testId:id,percent:r.percent});printCertificate(cert);showProfile();}catch(e){alert(e.message);}}}));}$('#app').replaceChildren(out);}catch(e){alert(e.message);}}}));
+    nodes.push(el('button',{className:'pri',textContent:'Testni yakunlash',onclick:async()=>{try{
+      const r=await api('/api/tests/'+id+'/submit','POST',{answers});
+      const out=el('section',{className:'profile-card test-result'},el('h2',{textContent:'Test natijasi'}),el('div',{className:'test-score',textContent:`${r.percent}%`}),el('p',{textContent:`To‘g‘ri javoblar: ${r.correct}/${r.total}. Kerakli natija: ${r.required}%.`}),el('p',{textContent:r.passed?'Tabriklaymiz! Sertifikat olish huquqini qo‘lga kiritdingiz.':'Afsus, bu safar kerakli foizni to‘play olmadingiz.'}));
+      if(r.passed){
+        let current=await api('/api/me');
+        if(!current.profileName){const entered=prompt('Sertifikatda ko‘rinishi uchun ism-familiyangizni kiriting:');if(!entered||entered.trim().length<2){out.append(el('p',{className:'sub',textContent:'Sertifikat olish uchun profilingizda ism-familiya saqlashingiz kerak.'}));}else{await api('/api/profile','PUT',{profileName:entered.trim(),badge:current.badge||'none'});current=await api('/api/me');}}
+        else if(!current.profileNameEditUsed && confirm(`Sertifikatda “${current.profileName}” deb yoziladi. Ism-familiyangizni bir martalik tahrirlashni xohlaysizmi?`)){
+          const changed=prompt('Yangi ism-familiyangizni kiriting:',current.profileName);
+          if(changed && changed.trim() && changed.trim()!==current.profileName){await api('/api/profile','PUT',{profileName:changed.trim(),badge:current.badge||'none'});current=await api('/api/me');}
+        }
+        if(current.profileName){out.append(el('p',{textContent:'Sertifikat egasi: '+current.profileName}),el('button',{className:'pri',textContent:'Sertifikatni olish',onclick:async()=>{try{const cert=await api('/api/certificates','POST',{testId:id});printCertificate(cert);showProfile();}catch(e){alert(e.message);}}}));}
+      }else{
+        out.append(el('div',{className:'test-result-actions'},el('button',{className:'pri',textContent:'↻ Testga qaytish',onclick:()=>takeTest(id)}),el('button',{textContent:'⌂ Bosh menyuga qaytish',onclick:()=>showList()})));
+      }
+      $('#app').replaceChildren(out);
+    }catch(e){alert(e.message);}}}));
     $('#app').replaceChildren(...nodes);
   }catch(e){alert(e.message);}
 }
+
 function printCertificate(c){
   const w=window.open('','_blank');if(!w){alert('Sertifikatni ko‘rish uchun oynani ochishga ruxsat bering.');return;}
   const safe=x=>String(x||'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -468,7 +494,6 @@ async function showPlans(msg = '') {
   let ts = []; try { ts = await api('/api/plans'); } catch {}
   const err = el('div', { className: 'err', textContent: msg });
   if (msg) err.style.color = 'inherit';
-  const code = el('input', { placeholder: 'Promo kod' });
   const plan = (name, price, items, on, extra) => el('div', { className: 'plan' + (on ? ' on' : '') },
     el('h3', { textContent: name }), el('div', { className: 'price', textContent: price }),
     el('ul', {}, items.map(t => el('li', { textContent: t }))),
@@ -479,13 +504,7 @@ async function showPlans(msg = '') {
   if (!ts.length && !me.pro) cards.push(plan('Pro', "Tariflar hozircha mavjud emas", ['Admin tarif qo‘shganidan keyin shu yerda ko‘rinadi'], false, botLink('Telegram botni ochish')));
   $('#app').replaceChildren(el('h2', { textContent: 'Obuna', style: 'margin-bottom:16px' }),
     el('div', { className: 'plans' }, cards),
-    el('p', { className: 'sub', style: 'margin:18px 0' }, 'Tarifni tanlang, bot orqali to‘lov chekini yuboring. Admin tasdiqlagach, bir martalik promo-kod olasiz.'),
-    el('div', { className: 'form sec' }, el('h3', { textContent: 'Promo kod' }),
-      el('p', { className: 'sub', textContent: "Promo kodingiz bo'lsa, shu yerga yozing va Pro obunani oling." }), code, err,
-      el('button', { className: 'pri', textContent: 'Faollashtirish', onclick: async () => {
-        try { const r = await api('/api/promo/redeem', 'POST', { code: code.value }); showPlans('Pro faollashdi: +' + r.days + ' kun'); }
-        catch (e) { err.style.color = ''; err.textContent = e.message; }
-      } })));
+    el('p', { className: 'sub', style: 'margin:18px 0' }, 'Tarifni tanlang va bot orqali to‘lov chekini yuboring. Admin to‘lovni tasdiqlashi bilan Pro obunangiz avtomatik faollashadi — promo-kod kiritish shart emas.'));
 }
 
 async function showAdminPanel(tab = 'stats') {

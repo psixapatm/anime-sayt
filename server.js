@@ -2,6 +2,8 @@
 
 
 
+
+
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -285,7 +287,7 @@ app.post('/api/account/change/start', auth, wrap(async (req, res) => {
   await users.updateOne({ id: user.id }, { $set: { pendingAccountChange: pending } });
   try { await telegramSend(user.telegramChatId, `🔐 Akaunt ma’lumotlarini o‘zgartirish kodi: ${code}\n\nKod 10 daqiqa amal qiladi. Agar bu so‘rov sizniki bo‘lmasa, xabarni e’tiborsiz qoldiring.`); }
   catch (e) { await users.updateOne({ id: user.id }, { $unset: { pendingAccountChange: '' } }); return res.status(502).json({ error: 'Telegramga kod yuborilmadi. Botni ochib /start bosing va qayta urinib ko‘ring.' }); }
-  res.json({ ok: true, message: 'Tasdiqlash kodi Telegram botingizga yuborildi.' });
+  res.json({ ok: true, message: 'Tasdiqlash kodi Telegram botingizga yuborildi.', botUrl: `https://t.me/${TELEGRAM_BOT_USERNAME}` });
 }));
 app.post('/api/account/change/verify', auth, wrap(async (req, res) => {
   const code = String(req.body.code || '').trim();

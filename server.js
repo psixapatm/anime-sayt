@@ -653,15 +653,32 @@ async function pollTelegram() {
         if (/^(payok|payno):/.test(q.data || '')) {
           if (!role || !['owner', 'main'].includes(role.level)) { await telegramApi('answerCallbackQuery', { callback_query_id: q.id, text: 'Bu amal uchun ruxsat yo‘q.' }); continue; }
           const [action, paymentId] = q.data.split(':');
-          const payment = await payments.findOne({ id: paymentId, status: 'pending' });
+          const payment = await payments.findOne({ id: paymentId, status: { $in: ['pending', 'activation_error'] } });
           if (!payment) { await telegramApi('answerCallbackQuery', { callback_query_id: q.id, text: 'To‘lov allaqachon ko‘rib chiqilgan.' }); continue; }
           if (action === 'payok') {
             const days = Number(payment.days || (await tariffs.findOne({ id: payment.planId }))?.days || 0);
             if (!days) { await telegramApi('answerCallbackQuery', { callback_query_id: q.id, text: 'Tarif muddati topilmadi.' }); continue; }
-            const result = await payments.updateOne({ id: paymentId, status: 'pending' }, { $set: { status: 'activating', reviewed: Date.now(), reviewedBy: chatId } });
+            // Avval to'lov aynan qaysi sayt akkauntiga tegishli ekanini topamiz.
+            // Yangi yozuvlarda userId/siteUserId ishlatiladi; eski yozuvlarda username + Telegram chat orqali
+            // faqat bitta mos akkaunt topilsagina xavfsiz fallback qilinadi.
+            let paidUser = null;
+            const exactUserId = payment.userId || payment.siteUserId;
+            if (exactUserId) paidUser = await users.findOne({ id: exactUserId, role: 'user' });
+            if (!paidUser && payment.username && payment.chatId) {
+              const matches = await users.find({
+                username: payment.username,
+                telegramChatId: String(payment.chatId),
+                role: 'user'
+              }).limit(2).toArray();
+              if (matches.length === 1) paidUser = matches[0];
+            }
+            if (!paidUser) {
+              await payments.updateOne({ id: paymentId }, { $set: { status: 'activation_error', activationError: 'site_user_not_found_or_ambiguous', reviewed: Date.now(), reviewedBy: chatId } });
+              await telegramSend(chatId, 'To‘lov tasdiqlandi, ammo to‘lov bog‘langan sayt akkaunti aniq topilmadi. Obunani boshqa akkauntga bermaslik uchun faollashtirish to‘xtatildi. To‘lov ID: ' + paymentId + '. Adminga murojaat qiling.');
+              continue;
+            }
+            const result = await payments.updateOne({ id: paymentId, status: { $in: ['pending', 'activation_error'] } }, { $set: { status: 'activating', reviewed: Date.now(), reviewedBy: chatId, userId: paidUser.id, siteUserId: paidUser.id, username: paidUser.username } });
             if (!result.modifiedCount) { await telegramApi('answerCallbackQuery', { callback_query_id: q.id, text: 'Boshqa admin avval ko‘rib chiqdi.' }); continue; }
-            const paidUser = await users.findOne({ id: payment.userId });
-            if (!paidUser) { await payments.updateOne({ id: paymentId }, { $set: { status: 'activation_error', reviewed: Date.now(), reviewedBy: chatId } }); await telegramSend(chatId, 'To‘lov tasdiqlandi, ammo sayt hisobi topilmadi. Adminga murojaat qiling.'); continue; }
             const startFrom = Math.max(Date.now(), Number(paidUser.proUntil || 0));
             const proUntil = startFrom + days * 24 * 60 * 60 * 1000;
             await users.updateOne({ id: paidUser.id }, { $set: { proUntil } });
@@ -855,7 +872,9 @@ async function pollTelegram() {
   );
   app.listen(process.env.PORT || 3000, () => { console.log('Sayt ishga tushdi'); if (TELEGRAM_BOT_TOKEN) { if (!ADMIN_TELEGRAM_ID) console.warn('ADMIN_TELEGRAM_ID kiritilmagan: admin xabarlari va anonim murojaatlar ishlamaydi.'); pollTelegram(); } else console.warn('TELEGRAM_BOT_TOKEN kiritilmagan: Telegram tasdiqlash o‘chiq.'); });
 })().catch(e => { console.error('Bazaga ulanib bo\'lmadi:', e.message); process.exit(1); });
+Контекстное окно заполнено
+Начните новый чат с автоматически созданной сводкой этого разговора или перейдите на платный план, чтобы продолжить здесь и увеличить объём доступного контекста в каждом чате.
 
 
-
+xa men ikalasini ham joylaganman
 

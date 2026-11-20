@@ -595,7 +595,7 @@ async function showPlans(msg = '') {
   if (!ts.length && !me.pro) cards.push(plan('Pro', "Tariflar hozircha mavjud emas", ['Admin tarif qo‘shganidan keyin shu yerda ko‘rinadi'], false, botLink('Telegram botni ochish')));
   $('#app').replaceChildren(el('h2', { textContent: 'Obuna', style: 'margin-bottom:16px' }),
     el('div', { className: 'plans' }, cards),
-    el('p', { className: 'sub', style: 'margin:18px 0' }, 'Tarifni tanlang va bot orqali to‘lov chekini yuboring. Admin to‘lovni tasdiqlashi bilan Pro obunangiz avtomatik faollashadi — promo-kod kiritish shart emas.'));
+    el('p', { className: 'sub', style: 'margin:18px 0' }, 'Tarifni tanlang va bot orqali to‘lov chekini yuboring. Agar Telegramingizga bir nechta sayt akkaunti ulangan bo‘lsa, bot avval qaysi akkaunt uchun Pro olishingizni tanlatadi. Tanlangan akkaunt nomi va IDsi to‘lovdan oldin ko‘rsatiladi. Admin tasdiqlagach, Pro aynan shu akkauntga faollashadi.'));
 }
 
 async function showAdminPanel(tab = 'stats') {
@@ -644,7 +644,8 @@ async function showAdminPanel(tab = 'stats') {
         }
         return el('div', { className: 'cm urow' },
           el('div', {}, el('b', { textContent: u.username }),
-            el('small', { textContent: (u.owner ? ' (bosh admin)' : u.role === 'admin' ? (u.adminLevel === 'main' ? ' (Main Admin)' : ' (Oddiy Admin)') : '') + (pro ? ' | Pro: ' + new Date(u.proUntil).toLocaleDateString() + ' gacha' : '') + ' | ' + (u.created ? new Date(u.created).toLocaleDateString() : '-') })),
+            el('small', { textContent: (u.owner ? ' (bosh admin)' : u.role === 'admin' ? (u.adminLevel === 'main' ? ' (Main Admin)' : ' (Oddiy Admin)') : '') + (pro ? ' | Pro: ' + new Date(u.proUntil).toLocaleDateString() + ' gacha' : '') + ' | ' + (u.created ? new Date(u.created).toLocaleDateString() : '-') }),
+            el('small', { textContent: 'Sayt ID: ' + u.id + ' | Telegram: ' + (u.telegramUsername ? '@' + u.telegramUsername : 'username mavjud emas') + ' | Telegram ID: ' + (u.telegramUserId || u.telegramChatId || 'ulanmagan') })),
           el('div', { className: 'btns2' }, ...controls));
       }));
     } else if (tab === 'comments') {

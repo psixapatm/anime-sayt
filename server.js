@@ -5,6 +5,8 @@
 
 
 
+
+
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -21,7 +23,7 @@ const SECRET = process.env.JWT_SECRET ||
   crypto.createHash('sha256').update(MONGODB_URI + ADMIN_PASS).digest('hex');
 
 const app = express();
-let users, animes, comments, genres, reactions, notifs, promos, tariffs, pendingRegs;
+let users, animes, comments, genres, reactions, notifs, promos, tariffs, pendingRegs, tests;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_BOT_USERNAME = 'verification_zverbot';
 const ADMIN_TELEGRAM_ID = String(process.env.ADMIN_TELEGRAM_ID || '').trim();
@@ -102,7 +104,7 @@ app.post('/api/login', wrap(async (req, res) => {
 app.get('/api/me', auth, wrap(async (req, res) => {
   const u = await users.findOne({ id: req.user.id });
   if (!u) return res.status(401).json({ error: 'Avval tizimga kiring' });
-  res.json({ username: u.username, role: u.role, adminLevel: u.adminLevel || null, favs: u.favs || [], owner: u.lower === ADMIN_USER.toLowerCase(), proUntil: u.proUntil || null, pro: (u.proUntil || 0) > Date.now() });
+  res.json({ username: u.username, role: u.role, adminLevel: u.adminLevel || null, favs: u.favs || [], owner: u.lower === ADMIN_USER.toLowerCase(), proUntil: u.proUntil || null, pro: (u.proUntil || 0) > Date.now(), profileName: u.profileName || '', badge: u.badge || 'none', recent: u.recent || [], certificates: u.certificates || [] });
 }));
 
 app.get('/api/anime', auth, wrap(async (req, res) => {
@@ -247,7 +249,81 @@ app.delete('/api/comments/:cid', auth, wrap(async (req, res) => {
 // Ko'rishlar soni va tahrirlash
 app.post('/api/anime/:id/view', auth, wrap(async (req, res) => {
   await animes.updateOne({ id: req.params.id }, { $inc: { views: 1 } });
+  await users.updateOne({ id: req.user.id }, { $pull: { recent: { id: req.params.id } } });
+  await users.updateOne({ id: req.user.id }, { $push: { recent: { $each: [{ id: req.params.id, at: Date.now() }], $position: 0, $slice: 5 } } });
   res.json({ ok: true });
+}));
+
+// Profil: ism-familiya va PRO bezagi (avatar saqlanmaydi).
+app.put('/api/profile', auth, wrap(async (req, res) => {
+  const profileName = String(req.body.profileName || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  const badge = String(req.body.badge || 'none');
+  const allowed = ['none','crown','star','fire','diamond','code'];
+  if (profileName && !/^[\p{L} .'-]{2,80}$/u.test(profileName)) return res.status(400).json({ error: 'Ism-familiyani tekshiring.' });
+  if (!allowed.includes(badge)) return res.status(400).json({ error: 'Belgi noto‘g‘ri.' });
+  const u = await users.findOne({ id: req.user.id });
+  if (badge !== 'none' && (u.proUntil || 0) <= Date.now()) return res.status(403).json({ error: 'Profil bezaklari faqat faol Pro obunachilar uchun.' });
+  await users.updateOne({ id: req.user.id }, { $set: { profileName, badge } });
+  res.json({ ok: true, profileName, badge });
+}));
+
+// Testlar: foydalanuvchilar faqat faol testlarni ko‘radi.
+app.get('/api/tests', auth, wrap(async (req, res) => {
+  const rows = await tests.find({ active: true }, { projection: { _id: 0, questions: 0 } }).sort({ created: -1 }).toArray();
+  res.json(rows);
+}));
+app.get('/api/tests/:id', auth, wrap(async (req, res) => {
+  const t = await tests.findOne({ id: req.params.id, active: true });
+  if (!t) return res.status(404).json({ error: 'Test topilmadi.' });
+  res.json({ id: t.id, title: t.title, courseId: t.courseId, courseTitle: t.courseTitle, questions: (t.questions || []).map(q => ({ id: q.id, text: q.text, options: q.options })) });
+}));
+app.post('/api/tests/:id/submit', auth, wrap(async (req, res) => {
+  const t = await tests.findOne({ id: req.params.id, active: true });
+  if (!t) return res.status(404).json({ error: 'Test topilmadi.' });
+  const answers = req.body.answers || {};
+  let correct = 0;
+  for (const q of (t.questions || [])) if (Number(answers[q.id]) === Number(q.correct)) correct++;
+  const total = (t.questions || []).length;
+  if (!total) return res.status(400).json({ error: 'Test savollari mavjud emas.' });
+  const percent = Math.round(correct / total * 100), passed = percent >= (t.passPercent || 70);
+  await users.updateOne({ id: req.user.id }, { $push: { testResults: { $each: [{ testId: t.id, percent, passed, at: Date.now() }], $slice: -50 } } });
+  res.json({ correct, total, percent, passed, testId: t.id, courseId: t.courseId, courseTitle: t.courseTitle, required: t.passPercent || 70 });
+}));
+app.get('/api/admin/tests', auth, mainAdminOnly, wrap(async (req, res) => {
+  res.json(await tests.find({}, { projection: { _id: 0 } }).sort({ created: -1 }).toArray());
+}));
+app.post('/api/admin/tests', auth, mainAdminOnly, wrap(async (req, res) => {
+  const title = String(req.body.title || '').trim().slice(0, 100);
+  const courseId = String(req.body.courseId || '');
+  const course = await animes.findOne({ id: courseId });
+  const questions = Array.isArray(req.body.questions) ? req.body.questions.slice(0, 50) : [];
+  if (!title || !course || !questions.length) return res.status(400).json({ error: 'Test nomi, kurs va savollarni kiriting.' });
+  const clean = questions.map(q => ({ id: crypto.randomUUID(), text: String(q.text || '').trim().slice(0, 500), options: (q.options || []).slice(0, 6).map(x => String(x).slice(0, 200)), correct: Number(q.correct) }));
+  if (clean.some(q => !q.text || q.options.length < 2 || !Number.isInteger(q.correct) || q.correct < 0 || q.correct >= q.options.length)) return res.status(400).json({ error: 'Savol yoki javob variantlarini tekshiring.' });
+  const doc = { id: crypto.randomUUID(), title, courseId, courseTitle: course.title, questions: clean, passPercent: Math.max(50, Math.min(100, Number(req.body.passPercent) || 70)), active: req.body.active !== false, created: Date.now() };
+  await tests.insertOne(doc); res.json({ ok: true, id: doc.id });
+}));
+app.put('/api/admin/tests/:id', auth, mainAdminOnly, wrap(async (req, res) => {
+  const t = await tests.findOne({ id: req.params.id }); if (!t) return res.status(404).json({ error: 'Test topilmadi.' });
+  const active = req.body.active !== false;
+  const title = req.body.title === undefined ? t.title : String(req.body.title).trim().slice(0,100);
+  const set = { title, active, passPercent: Math.max(50, Math.min(100, Number(req.body.passPercent) || t.passPercent || 70)) };
+  if (Array.isArray(req.body.questions)) { const clean = req.body.questions.slice(0,50).map(q => ({ id: q.id || crypto.randomUUID(), text: String(q.text || '').trim().slice(0,500), options: (q.options || []).slice(0,6).map(x => String(x).slice(0,200)), correct: Number(q.correct) })); if (!clean.length || clean.some(q => !q.text || q.options.length < 2 || !Number.isInteger(q.correct) || q.correct < 0 || q.correct >= q.options.length)) return res.status(400).json({ error: 'Savol va javob variantlarini tekshiring.' }); set.questions = clean; }
+  await tests.updateOne({ id: t.id }, { $set: set });
+  res.json({ ok: true });
+}));
+app.delete('/api/admin/tests/:id', auth, mainAdminOnly, wrap(async (req, res) => { await tests.deleteOne({ id: req.params.id }); res.json({ ok: true }); }));
+app.post('/api/certificates', auth, wrap(async (req, res) => {
+  const fullName = String(req.body.fullName || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  const testId = String(req.body.testId || '');
+  const percent = Number(req.body.percent);
+  const t = await tests.findOne({ id: testId, active: true });
+  const user = await users.findOne({ id: req.user.id });
+  const passed = (user.testResults || []).some(x => x.testId === testId && x.passed && x.percent >= (t?.passPercent || 70));
+  if (!t || !passed || !fullName || !/^[\p{L} .'-]{2,80}$/u.test(fullName)) return res.status(400).json({ error: 'Avval testdan kerakli natija bilan o‘ting va ism-familiyangizni kiriting.' });
+  const cert = { id: 'DK-' + crypto.randomBytes(5).toString('hex').toUpperCase(), fullName, courseTitle: t.courseTitle, issuer: 'Sobirov Muhammadumar', percent, created: Date.now() };
+  await users.updateOne({ id: req.user.id }, { $push: { certificates: { $each: [cert], $slice: -30 } } });
+  res.json(cert);
 }));
 app.put('/api/anime/:id', auth, mainAdminOnly, wrap(async (req, res) => {
   const b = req.body;
@@ -650,6 +726,7 @@ async function pollTelegram() {
   promos = db.collection('promos');
   tariffs = db.collection('tariffs');
   pendingRegs = db.collection('pendingRegs');
+  tests = db.collection('tests');
   botReplies = db.collection('botReplies');
   payments = db.collection('payments');
   botSettings = db.collection('botSettings');

@@ -2,11 +2,6 @@
 
 
 
-
-
-
-
-
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -104,7 +99,7 @@ app.post('/api/login', wrap(async (req, res) => {
 app.get('/api/me', auth, wrap(async (req, res) => {
   const u = await users.findOne({ id: req.user.id });
   if (!u) return res.status(401).json({ error: 'Avval tizimga kiring' });
-  res.json({ username: u.username, role: u.role, adminLevel: u.adminLevel || null, favs: u.favs || [], owner: u.lower === ADMIN_USER.toLowerCase(), proUntil: u.proUntil || null, pro: (u.proUntil || 0) > Date.now(), profileName: u.profileName || '', badge: u.badge || 'none', recent: u.recent || [], certificates: u.certificates || [] });
+  res.json({ username: u.username, role: u.role, adminLevel: u.adminLevel || null, favs: u.favs || [], owner: u.lower === ADMIN_USER.toLowerCase(), proUntil: u.proUntil || null, pro: (u.proUntil || 0) > Date.now(), profileName: u.profileName || '', profileNameEditUsed: !!u.profileNameEditUsed, badge: u.badge || 'none', recent: u.recent || [], certificates: u.certificates || [] });
 }));
 
 app.get('/api/anime', auth, wrap(async (req, res) => {
@@ -254,7 +249,7 @@ app.post('/api/anime/:id/view', auth, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// Profil: ism-familiya va PRO bezagi (avatar saqlanmaydi).
+// Profil: ism-familiya bir marta tahrirlanadi; PRO bezagi.
 app.put('/api/profile', auth, wrap(async (req, res) => {
   const profileName = String(req.body.profileName || '').trim().replace(/\s+/g, ' ').slice(0, 80);
   const badge = String(req.body.badge || 'none');
@@ -263,8 +258,53 @@ app.put('/api/profile', auth, wrap(async (req, res) => {
   if (!allowed.includes(badge)) return res.status(400).json({ error: 'Belgi noto‘g‘ri.' });
   const u = await users.findOne({ id: req.user.id });
   if (badge !== 'none' && (u.proUntil || 0) <= Date.now()) return res.status(403).json({ error: 'Profil bezaklari faqat faol Pro obunachilar uchun.' });
-  await users.updateOne({ id: req.user.id }, { $set: { profileName, badge } });
-  res.json({ ok: true, profileName, badge });
+  const oldName = String(u.profileName || '').trim();
+  const nameChanged = !!oldName && profileName !== oldName;
+  if (nameChanged && u.profileNameEditUsed) return res.status(403).json({ error: 'Ism-familiyangizni tahrirlash imkoniyati bir marta ishlatilgan.' });
+  const set = { badge };
+  if (!oldName || profileName === oldName || nameChanged) set.profileName = profileName;
+  if (nameChanged) set.profileNameEditUsed = true;
+  await users.updateOne({ id: req.user.id }, { $set: set });
+  res.json({ ok: true, profileName: set.profileName ?? oldName, badge, profileNameEditUsed: !!(u.profileNameEditUsed || nameChanged) });
+}));
+
+// Login/parolni o‘zgartirish: tasdiqlash kodi faqat foydalanuvchining ulangan Telegram chatiga yuboriladi.
+app.post('/api/account/change/start', auth, wrap(async (req, res) => {
+  if (!TELEGRAM_BOT_TOKEN) return res.status(503).json({ error: 'Telegram bot hozircha sozlanmagan.' });
+  const user = await users.findOne({ id: req.user.id });
+  if (!user?.telegramChatId) return res.status(400).json({ error: 'Telegram hisobingiz ulanmagan. Avval bot orqali ro‘yxatdan o‘tgan hisobdan foydalaning.' });
+  const username = String(req.body.username || '').trim();
+  const password = String(req.body.password || '');
+  if (!username && !password) return res.status(400).json({ error: 'Yangi login yoki yangi parol kiriting.' });
+  if (username && !/^[a-zA-Z0-9_]{3,20}$/.test(username)) return res.status(400).json({ error: 'Login 3–20 ta harf, raqam yoki _ dan iborat bo‘lishi kerak.' });
+  if (password && password.length < 6) return res.status(400).json({ error: 'Yangi parol kamida 6 ta belgidan iborat bo‘lsin.' });
+  if (username && username.toLowerCase() !== user.lower && await users.findOne({ lower: username.toLowerCase() })) return res.status(409).json({ error: 'Bu login band.' });
+  if (user.pendingAccountChange?.created > Date.now() - 60 * 1000) return res.status(429).json({ error: 'Yangi kod so‘rashdan oldin 1 daqiqa kuting.' });
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  const pending = { username: username || null, hash: password ? bcrypt.hashSync(password, 10) : null, codeHash: crypto.createHash('sha256').update(code).digest('hex'), created: Date.now(), expires: Date.now() + 10 * 60 * 1000, attempts: 0 };
+  await users.updateOne({ id: user.id }, { $set: { pendingAccountChange: pending } });
+  try { await telegramSend(user.telegramChatId, `🔐 Akaunt ma’lumotlarini o‘zgartirish kodi: ${code}\n\nKod 10 daqiqa amal qiladi. Agar bu so‘rov sizniki bo‘lmasa, xabarni e’tiborsiz qoldiring.`); }
+  catch (e) { await users.updateOne({ id: user.id }, { $unset: { pendingAccountChange: '' } }); return res.status(502).json({ error: 'Telegramga kod yuborilmadi. Botni ochib /start bosing va qayta urinib ko‘ring.' }); }
+  res.json({ ok: true, message: 'Tasdiqlash kodi Telegram botingizga yuborildi.' });
+}));
+app.post('/api/account/change/verify', auth, wrap(async (req, res) => {
+  const code = String(req.body.code || '').trim();
+  if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: '6 xonali kodni kiriting.' });
+  const user = await users.findOne({ id: req.user.id });
+  const pending = user?.pendingAccountChange;
+  if (!pending || pending.expires <= Date.now()) { await users.updateOne({ id: req.user.id }, { $unset: { pendingAccountChange: '' } }); return res.status(400).json({ error: 'Kod muddati tugagan. Yangi kod so‘rang.' }); }
+  const digest = crypto.createHash('sha256').update(code).digest('hex');
+  if (digest !== pending.codeHash) {
+    const attempts = Number(pending.attempts || 0) + 1;
+    await users.updateOne({ id: req.user.id }, attempts >= 5 ? { $unset: { pendingAccountChange: '' } } : { $set: { 'pendingAccountChange.attempts': attempts } });
+    return res.status(400).json({ error: attempts >= 5 ? 'Kod 5 marta noto‘g‘ri kiritildi. Yangi kod so‘rang.' : `Kod noto‘g‘ri. Qolgan urinish: ${5 - attempts}.` });
+  }
+  const set = {};
+  if (pending.username && pending.username.toLowerCase() !== user.lower && await users.findOne({ lower: pending.username.toLowerCase() })) return res.status(409).json({ error: 'Bu login boshqa foydalanuvchi tomonidan band qilindi. Yangi login bilan qayta urinib ko‘ring.' });
+  if (pending.username) { set.username = pending.username; set.lower = pending.username.toLowerCase(); }
+  if (pending.hash) set.hash = pending.hash;
+  await users.updateOne({ id: user.id }, { $set: set, $unset: { pendingAccountChange: '' } });
+  res.json({ ok: true, username: set.username || user.username, message: 'Akaunt ma’lumotlari muvaffaqiyatli yangilandi.' });
 }));
 
 // Testlar: foydalanuvchilar faqat faol testlarni ko‘radi.
@@ -314,14 +354,13 @@ app.put('/api/admin/tests/:id', auth, mainAdminOnly, wrap(async (req, res) => {
 }));
 app.delete('/api/admin/tests/:id', auth, mainAdminOnly, wrap(async (req, res) => { await tests.deleteOne({ id: req.params.id }); res.json({ ok: true }); }));
 app.post('/api/certificates', auth, wrap(async (req, res) => {
-  const fullName = String(req.body.fullName || '').trim().replace(/\s+/g, ' ').slice(0, 80);
   const testId = String(req.body.testId || '');
-  const percent = Number(req.body.percent);
   const t = await tests.findOne({ id: testId, active: true });
   const user = await users.findOne({ id: req.user.id });
-  const passed = (user.testResults || []).some(x => x.testId === testId && x.passed && x.percent >= (t?.passPercent || 70));
-  if (!t || !passed || !fullName || !/^[\p{L} .'-]{2,80}$/u.test(fullName)) return res.status(400).json({ error: 'Avval testdan kerakli natija bilan o‘ting va ism-familiyangizni kiriting.' });
-  const cert = { id: 'DK-' + crypto.randomBytes(5).toString('hex').toUpperCase(), fullName, courseTitle: t.courseTitle, issuer: 'Sobirov Muhammadumar', percent, created: Date.now() };
+  const attempt = (user.testResults || []).filter(x => x.testId === testId && x.passed && x.percent >= (t?.passPercent || 70)).sort((a,b) => b.at - a.at)[0];
+  const fullName = String(user.profileName || '').trim();
+  if (!t || !attempt || !fullName || !/^[\p{L} .'-]{2,80}$/u.test(fullName)) return res.status(400).json({ error: 'Sertifikat uchun profilingizda ism-familiya saqlangan bo‘lishi va testdan o‘tgan bo‘lishingiz kerak.' });
+  const cert = { id: 'DK-' + crypto.randomBytes(5).toString('hex').toUpperCase(), fullName, courseTitle: t.courseTitle, issuer: 'Sobirov Muhammadumar', percent: attempt.percent, created: Date.now() };
   await users.updateOne({ id: req.user.id }, { $push: { certificates: { $each: [cert], $slice: -30 } } });
   res.json(cert);
 }));
@@ -600,12 +639,15 @@ async function pollTelegram() {
           if (action === 'payok') {
             const days = Number(payment.days || (await tariffs.findOne({ id: payment.planId }))?.days || 0);
             if (!days) { await telegramApi('answerCallbackQuery', { callback_query_id: q.id, text: 'Tarif muddati topilmadi.' }); continue; }
-            const result = await payments.updateOne({ id: paymentId, status: 'pending' }, { $set: { status: 'approved', reviewed: Date.now(), reviewedBy: chatId } });
+            const result = await payments.updateOne({ id: paymentId, status: 'pending' }, { $set: { status: 'activating', reviewed: Date.now(), reviewedBy: chatId } });
             if (!result.modifiedCount) { await telegramApi('answerCallbackQuery', { callback_query_id: q.id, text: 'Boshqa admin avval ko‘rib chiqdi.' }); continue; }
-            let code;
-            for (let i = 0; i < 5; i++) { code = 'PRO-' + crypto.randomBytes(5).toString('hex').toUpperCase(); try { await promos.insertOne({ id: crypto.randomUUID(), code, days, maxUses: 1, used: 0, usedBy: [], created: Date.now(), source: 'telegram-payment' }); break; } catch (e) { if (e.code !== 11000 || i === 4) throw e; } }
-            await payments.updateOne({ id: paymentId }, { $set: { promoCode: code } });
-            await telegramSend(payment.chatId, `✅ To‘lovingiz tasdiqlandi!\n\nTarif: ${payment.planName}\nMuddat: ${days} kun\n\n🎟 Promo-kodingiz: ${code}\n\nSaytdagi Obuna bo‘limida kodni faollashtiring. Kod bir marta ishlatiladi.`, { reply_markup: USER_MENU });
+            const paidUser = await users.findOne({ id: payment.userId });
+            if (!paidUser) { await payments.updateOne({ id: paymentId }, { $set: { status: 'activation_error', reviewed: Date.now(), reviewedBy: chatId } }); await telegramSend(chatId, 'To‘lov tasdiqlandi, ammo sayt hisobi topilmadi. Adminga murojaat qiling.'); continue; }
+            const startFrom = Math.max(Date.now(), Number(paidUser.proUntil || 0));
+            const proUntil = startFrom + days * 24 * 60 * 60 * 1000;
+            await users.updateOne({ id: paidUser.id }, { $set: { proUntil } });
+            await payments.updateOne({ id: paymentId }, { $set: { status: 'approved', proActivated: true, proUntil } });
+            await telegramSend(payment.chatId, `✅ To‘lovingiz tasdiqlandi va Pro obunangiz avtomatik faollashtirildi!\n\nTarif: ${payment.planName}\nMuddat: ${days} kun\nAmal qilish muddati: ${new Date(proUntil).toLocaleDateString('uz-UZ')}\n\nSaytga qaytib sahifani yangilang — Pro imkoniyatlari ochiladi. Promo-kod kiritish shart emas.`, { reply_markup: USER_MENU });
             await logAdmin(chatId, 'payment_approved', paymentId);
           } else {
             const result = await payments.updateOne({ id: paymentId, status: 'pending' }, { $set: { status: 'rejected', reviewed: Date.now(), reviewedBy: chatId } });

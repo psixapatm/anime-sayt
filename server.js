@@ -18,7 +18,7 @@ let users, animes, comments, genres, reactions, notifs, promos, tariffs, pending
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_BOT_USERNAME = 'verification_zverbot';
 const ADMIN_TELEGRAM_ID = String(process.env.ADMIN_TELEGRAM_ID || '').trim();
-let botReplies;
+let botReplies, payments, botSettings, telegramAdmins, blockedUsers, adminLogs;
 
 app.use(express.json({ limit: '100kb' }));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
@@ -56,50 +56,25 @@ app.post('/api/register/start', wrap(async (req, res) => {
   const nonce = crypto.randomBytes(18).toString('hex');
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
   await pendingRegs.deleteMany({ $or: [{ lower: username.toLowerCase() }, { expires: { $lte: Date.now() } }] });
-  await pendingRegs.insertOne({
-    nonce,
-    username,
-    lower: username.toLowerCase(),
-    hash: bcrypt.hashSync(password, 10),
-    codeHash: crypto.createHash('sha256').update(code).digest('hex'),
-    codeForBot: code,
-    chatId: null,
-    created: Date.now(),
-    expires: Date.now() + 10 * 60 * 1000
-  });
+  await pendingRegs.insertOne({ nonce, username, lower: username.toLowerCase(), hash: bcrypt.hashSync(password, 10),
+    codeHash: crypto.createHash('sha256').update(code).digest('hex'), codeForBot: code, chatId: null, created: Date.now(), expires: Date.now() + 10 * 60 * 1000 });
   res.json({ ok: true, botUrl: `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${nonce}` });
 }));
 
 app.post('/api/register/verify', wrap(async (req, res) => {
   const nonce = String(req.body.nonce || '');
   const code = String(req.body.code || '').trim();
-  if (!/^[a-f0-9]{36}$/.test(nonce) || !/^\d{6}$/.test(code))
-    return res.status(400).json({ error: 'Tasdiqlash kodi yoki havola noto‘g‘ri.' });
+  if (!/^[a-f0-9]{36}$/.test(nonce) || !/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Tasdiqlash kodi yoki havola noto‘g‘ri.' });
   const pending = await pendingRegs.findOne({ nonce, expires: { $gt: Date.now() }, chatId: { $ne: null } });
   if (!pending) return res.status(400).json({ error: 'Avval botdagi havolani ochib Start bosing. Kod 10 daqiqa amal qiladi.' });
   const digest = crypto.createHash('sha256').update(code).digest('hex');
   if (digest !== pending.codeHash) return res.status(400).json({ error: 'Tasdiqlash kodi noto‘g‘ri.' });
-  const user = {
-    id: crypto.randomUUID(),
-    username: pending.username,
-    lower: pending.lower,
-    hash: pending.hash,
-    role: 'user',
-    created: Date.now(),
-    telegramChatId: pending.chatId
-  };
-  try {
-    await users.insertOne(user);
-  } catch (e) {
-    if (e.code === 11000) return res.status(409).json({ error: 'Bu login band' });
-    throw e;
-  }
+  const user = { id: crypto.randomUUID(), username: pending.username, lower: pending.lower, hash: pending.hash, role: 'user', created: Date.now(), telegramChatId: pending.chatId };
+  try { await users.insertOne(user); }
+  catch (e) { if (e.code === 11000) return res.status(409).json({ error: 'Bu login band' }); throw e; }
   await pendingRegs.deleteOne({ nonce });
   if (TELEGRAM_BOT_TOKEN && ADMIN_TELEGRAM_ID) {
-    telegramSend(
-      ADMIN_TELEGRAM_ID,
-      `🆕 Yangi foydalanuvchi ro‘yxatdan o‘tdi\nLogin: ${user.username}\nJami foydalanuvchilar: ${await users.countDocuments({ role: 'user' })}`
-    ).catch(e => console.error('Admin xabari yuborilmadi:', e.message));
+    telegramSend(ADMIN_TELEGRAM_ID, `🆕 Yangi foydalanuvchi ro‘yxatdan o‘tdi\nLogin: ${user.username}\nJami foydalanuvchilar: ${await users.countDocuments({ role: 'user' })}`).catch(e => console.error('Admin xabari yuborilmadi:', e.message));
   }
   res.json({ token: sign(user), user: { username: user.username, role: 'user' } });
 }));
@@ -115,25 +90,15 @@ app.post('/api/login', wrap(async (req, res) => {
 app.get('/api/me', auth, wrap(async (req, res) => {
   const u = await users.findOne({ id: req.user.id });
   if (!u) return res.status(401).json({ error: 'Avval tizimga kiring' });
-  res.json({
-    username: u.username,
-    role: u.role,
-    favs: u.favs || [],
-    owner: u.lower === ADMIN_USER.toLowerCase(),
-    proUntil: u.proUntil || null,
-    pro: (u.proUntil || 0) > Date.now()
-  });
+  res.json({ username: u.username, role: u.role, favs: u.favs || [], owner: u.lower === ADMIN_USER.toLowerCase(), proUntil: u.proUntil || null, pro: (u.proUntil || 0) > Date.now() });
 }));
 
 app.get('/api/anime', auth, wrap(async (req, res) => {
   const full = req.user.owner || req.user.role === 'admin' || req.user.pro;
   const all = await animes.find({}, { projection: { _id: 0 } }).sort({ created: -1 }).toArray();
-  res.json(all.map(a => full ? a : {
-    ...a,
-    video: a.videoPro ? '' : a.video,
-    locked: !!(a.videoPro && a.video),
-    episodes: (a.episodes || []).map(e => e.pro ? { ...e, video: '', locked: true } : e)
-  }));
+  res.json(all.map(a => full ? a : { ...a,
+    video: a.videoPro ? '' : a.video, locked: !!(a.videoPro && a.video),
+    episodes: (a.episodes || []).map(e => e.pro ? { ...e, video: '', locked: true } : e) }));
 }));
 
 const isUrl = (s) => /^https?:\/\//i.test(s);
@@ -147,8 +112,7 @@ const bunnyConfig = () => ({
 // Admin videoni Bunny Stream'ga to'g'ridan-to'g'ri yuklashi uchun vaqtinchalik TUS ruxsati.
 app.post('/api/videos/upload-init', auth, admin, wrap(async (req, res) => {
   const { apiKey, libraryId } = bunnyConfig();
-  if (!apiKey || !libraryId)
-    return res.status(503).json({ error: 'Video xotirasi sozlanmagan. Bunny Stream kalitlarini serverga kiriting.' });
+  if (!apiKey || !libraryId) return res.status(503).json({ error: 'Video xotirasi sozlanmagan. Bunny Stream kalitlarini serverga kiriting.' });
   const title = String(req.body.title || 'Yangi dars').trim().slice(0, 160);
   const created = await fetch(`https://video.bunnycdn.com/library/${libraryId}/videos`, {
     method: 'POST',
@@ -169,15 +133,12 @@ app.post('/api/videos/upload-init', auth, admin, wrap(async (req, res) => {
 // Faqat tizimga kirgan, shu darsni ko'rishga huquqi bor foydalanuvchiga qisqa muddatli player tokeni.
 app.get('/api/videos/:videoId/play', auth, wrap(async (req, res) => {
   const { libraryId, tokenKey } = bunnyConfig();
-  if (!libraryId || !tokenKey)
-    return res.status(503).json({ error: 'Himoyalangan video ko‘rish sozlanmagan.' });
+  if (!libraryId || !tokenKey) return res.status(503).json({ error: 'Himoyalangan video ko‘rish sozlanmagan.' });
   const videoId = String(req.params.videoId || '');
-  if (!/^[a-f0-9-]{30,40}$/i.test(videoId))
-    return res.status(400).json({ error: 'Video ID noto‘g‘ri.' });
+  if (!/^[a-f0-9-]{30,40}$/i.test(videoId)) return res.status(400).json({ error: 'Video ID noto‘g‘ri.' });
   const marker = 'bunny:' + videoId;
   const course = await animes.findOne({ $or: [{ video: marker }, { 'episodes.video': marker }] });
-  if (!course)
-    return res.status(404).json({ error: 'Video kursga biriktirilmagan yoki topilmadi.' });
+  if (!course) return res.status(404).json({ error: 'Video kursga biriktirilmagan yoki topilmadi.' });
   const episode = (course.episodes || []).find(e => e.video === marker);
   const needsPro = episode ? !!episode.pro : !!course.videoPro;
   if (needsPro && !req.user.owner && req.user.role !== 'admin' && !req.user.pro)
@@ -190,8 +151,7 @@ app.get('/api/videos/:videoId/play', auth, wrap(async (req, res) => {
 app.post('/api/anime', auth, admin, wrap(async (req, res) => {
   const b = req.body;
   const a = {
-    id: crypto.randomUUID(),
-    created: Date.now(),
+    id: crypto.randomUUID(), created: Date.now(),
     title: String(b.title || '').trim().slice(0, 120),
     description: String(b.description || '').trim().slice(0, 2000),
     genre: String(b.genre || '').trim().slice(0, 80),
@@ -199,12 +159,12 @@ app.post('/api/anime', auth, admin, wrap(async (req, res) => {
     poster: String(b.poster || '').trim(),
     video: String(b.video || '').trim(),
   };
-  a.videoPro = !!b.videoPro;
+  a.videoPro = false;
   if (!a.title) return res.status(400).json({ error: 'Nomini kiriting' });
-  if (a.poster && !isUrl(a.poster))
-    return res.status(400).json({ error: 'Poster havolasi http(s) bilan boshlanishi kerak' });
-  if (a.video && !isVideoRef(a.video))
-    return res.status(400).json({ error: 'Video havolasi yoki Bunny orqali yuklangan video kerak' });
+  if (a.poster && !isUrl(a.poster)) return res.status(400).json({ error: 'Poster havolasi http(s) bilan boshlanishi kerak' });
+  if (a.video && !isVideoRef(a.video)) return res.status(400).json({ error: 'YouTube video havolasini tekshiring' });
+  // Kurs yaratilishida kiritilgan asosiy video avtomatik 1-qism bo'ladi.
+  a.episodes = a.video ? [{ id: crypto.randomUUID(), title: '1-qism', video: a.video, order: 1, pro: !!b.videoPro, views: 0 }] : [];
   await animes.insertOne(a);
   await notify("Yangi kurs qo'shildi: " + a.title);
   res.json({ ok: true });
@@ -220,33 +180,22 @@ app.delete('/api/anime/:id', auth, ownerOnly, wrap(async (req, res) => {
 function cleanEp(b) {
   const title = String(b.title || '').trim().slice(0, 120);
   const video = String(b.video || '').trim();
-  if (!title || !isVideoRef(video))
-    return { error: 'Dars nomi va video havolasi yoki yuklangan video kerak' };
+  if (!title || !isVideoRef(video)) return { error: 'Dars nomi va video havolasi yoki yuklangan video kerak' };
   const order = parseInt(b.order);
   return { v: { title, video, order: Number.isFinite(order) ? order : null, pro: !!b.pro } };
 }
 app.post('/api/anime/:id/episodes', auth, admin, wrap(async (req, res) => {
   const ep = cleanEp(req.body);
   if (ep.error) return res.status(400).json({ error: ep.error });
-  const a = await animes.findOneAndUpdate(
-    { id: req.params.id },
-    { $push: { episodes: { id: crypto.randomUUID(), views: 0, ...ep.v } } }
-  );
+  const a = await animes.findOneAndUpdate({ id: req.params.id }, { $push: { episodes: { id: crypto.randomUUID(), views: 0, ...ep.v } } });
   if (a) await notify('"' + a.title + '" kursiga yangi dars: ' + ep.v.title);
   res.json({ ok: true });
 }));
 app.put('/api/anime/:id/episodes/:eid', auth, admin, wrap(async (req, res) => {
   const ep = cleanEp(req.body);
   if (ep.error) return res.status(400).json({ error: ep.error });
-  await animes.updateOne(
-    { id: req.params.id, 'episodes.id': req.params.eid },
-    { $set: {
-      'episodes.$.title': ep.v.title,
-      'episodes.$.video': ep.v.video,
-      'episodes.$.order': ep.v.order,
-      'episodes.$.pro': ep.v.pro
-    } }
-  );
+  await animes.updateOne({ id: req.params.id, 'episodes.id': req.params.eid },
+    { $set: { 'episodes.$.title': ep.v.title, 'episodes.$.video': ep.v.video, 'episodes.$.order': ep.v.order, 'episodes.$.pro': ep.v.pro } });
   res.json({ ok: true });
 }));
 app.post('/api/anime/:id/episodes/:eid/view', auth, wrap(async (req, res) => {
@@ -262,10 +211,7 @@ app.delete('/api/anime/:id/episodes/:eid', auth, ownerOnly, wrap(async (req, res
 app.post('/api/anime/:id/fav', auth, wrap(async (req, res) => {
   const u = await users.findOne({ id: req.user.id });
   const has = (u.favs || []).includes(req.params.id);
-  await users.updateOne(
-    { id: req.user.id },
-    has ? { $pull: { favs: req.params.id } } : { $addToSet: { favs: req.params.id } }
-  );
+  await users.updateOne({ id: req.user.id }, has ? { $pull: { favs: req.params.id } } : { $addToSet: { favs: req.params.id } });
   res.json({ favs: (await users.findOne({ id: req.user.id })).favs || [] });
 }));
 
@@ -273,24 +219,17 @@ app.post('/api/anime/:id/fav', auth, wrap(async (req, res) => {
 app.get('/api/anime/:id/comments', auth, wrap(async (req, res) => {
   res.json(await comments.find({ animeId: req.params.id }, { projection: { _id: 0 } }).sort({ created: -1 }).limit(100).toArray());
 }));
+}));
 app.post('/api/anime/:id/comments', auth, wrap(async (req, res) => {
   const text = String(req.body.text || '').trim().slice(0, 500);
   if (!text) return res.status(400).json({ error: "Izoh bo'sh bo'lmasin" });
-  await comments.insertOne({
-    id: crypto.randomUUID(),
-    animeId: req.params.id,
-    userId: req.user.id,
-    username: req.user.username,
-    text,
-    created: Date.now()
-  });
+  await comments.insertOne({ id: crypto.randomUUID(), animeId: req.params.id, userId: req.user.id, username: req.user.username, text, created: Date.now() });
   res.json({ ok: true });
 }));
 app.delete('/api/comments/:cid', auth, wrap(async (req, res) => {
   const c = await comments.findOne({ id: req.params.cid });
   if (!c) return res.json({ ok: true });
-  if (c.userId !== req.user.id && !req.user.owner)
-    return res.status(403).json({ error: "Ruxsat yo'q" });
+  if (c.userId !== req.user.id && !req.user.owner) return res.status(403).json({ error: "Ruxsat yo'q" });
   await comments.deleteOne({ id: c.id });
   res.json({ ok: true });
 }));
@@ -310,76 +249,54 @@ app.put('/api/anime/:id', auth, ownerOnly, wrap(async (req, res) => {
     poster: String(b.poster || '').trim(),
     video: String(b.video || '').trim(),
   };
-  set.videoPro = !!b.videoPro;
+  set.videoPro = false;
   if (!set.title) return res.status(400).json({ error: 'Nomini kiriting' });
-  if (set.poster && !isUrl(set.poster))
-    return res.status(400).json({ error: 'Poster havolasi http(s) bilan boshlanishi kerak' });
-  if (set.video && !isVideoRef(set.video))
-    return res.status(400).json({ error: 'Video havolasi yoki Bunny orqali yuklangan video kerak' });
+  if (set.poster && !isUrl(set.poster)) return res.status(400).json({ error: 'Poster havolasi http(s) bilan boshlanishi kerak' });
+  if (set.video && !isVideoRef(set.video)) return res.status(400).json({ error: 'YouTube video havolasini tekshiring' });
+  const existing = await animes.findOne({ id: req.params.id });
+  if (!existing) return res.status(404).json({ error: 'Kurs topilmadi' });
+  const eps = existing.episodes || [];
+  if (set.video) {
+    if (eps.length) {
+      eps[0].video = set.video;
+      eps[0].pro = !!b.videoPro;
+      if (!eps[0].title) eps[0].title = '1-qism';
+      if (eps[0].order == null) eps[0].order = 1;
+    } else {
+      eps.push({ id: crypto.randomUUID(), title: '1-qism', video: set.video, order: 1, pro: !!b.videoPro, views: 0 });
+    }
+  } else if (eps.length && eps[0].title === '1-qism') {
+    eps.shift();
+  }
+  set.episodes = eps;
   await animes.updateOne({ id: req.params.id }, { $set: set });
   res.json({ ok: true });
 }));
 
 // Admin panel
 app.get('/api/admin/stats', auth, ownerOnly, wrap(async (req, res) => {
-  const [u, a, c] = await Promise.all([
-    users.countDocuments(),
-    animes.countDocuments(),
-    comments.countDocuments()
-  ]);
+  const [u, a, c] = await Promise.all([users.countDocuments(), animes.countDocuments(), comments.countDocuments()]);
   const pro = await users.countDocuments({ proUntil: { $gt: Date.now() } });
   const all = await animes.find({}, { projection: { _id: 0 } }).toArray();
   const rx = {};
-  for (const r of await reactions.find({}).toArray()) {
-    const k = r.animeId + ':' + r.ep;
-    (rx[k] = rx[k] || { l: 0, d: 0 })[r.v > 0 ? 'l' : 'd']++;
-  }
+  for (const r of await reactions.find({}).toArray()) { const k = r.animeId + ':' + r.ep; (rx[k] = rx[k] || { l: 0, d: 0 })[r.v > 0 ? 'l' : 'd']++; }
   const views = all.reduce((n, x) => n + (x.views || 0), 0);
-  const courses = all.sort((x, y) => (y.views || 0) - (x.views || 0)).map(x => ({
-    id: x.id,
-    title: x.title,
-    views: x.views || 0,
-    lessons: (x.episodes || []).map(e => {
-      const r = rx[x.id + ':' + e.id] || {};
-      return {
-        title: e.title,
-        views: e.views || 0,
-        pro: !!e.pro,
-        likes: r.l || 0,
-        dislikes: r.d || 0
-      };
-    })
-  }));
+  const courses = all.sort((x, y) => (y.views || 0) - (x.views || 0)).map(x => ({ id: x.id, title: x.title, views: x.views || 0,
+    lessons: (x.episodes || []).map(e => { const r = rx[x.id + ':' + e.id] || {}; return { title: e.title, views: e.views || 0, pro: !!e.pro, likes: r.l || 0, dislikes: r.d || 0 }; }) }));
   res.json({ users: u, anime: a, comments: c, views, pro, courses });
 }));
 app.get('/api/admin/users', auth, ownerOnly, wrap(async (req, res) => {
   const list = await users.find({}, { projection: { _id: 0 } }).sort({ created: -1 }).toArray();
-  res.json(list.map(u => ({
-    id: u.id,
-    username: u.username,
-    role: u.role,
-    created: u.created || null,
-    favs: (u.favs || []).length,
-    owner: u.lower === ADMIN_USER.toLowerCase(),
-    proUntil: u.proUntil || null
-  })));
+  res.json(list.map(u => ({ id: u.id, username: u.username, role: u.role, created: u.created || null, favs: (u.favs || []).length, owner: u.lower === ADMIN_USER.toLowerCase(), proUntil: u.proUntil || null })));
 }));
 app.post('/api/admin/users', auth, ownerOnly, wrap(async (req, res) => {
   const username = String(req.body.username || '').trim();
   const password = String(req.body.password || '');
-  if (!/^[a-zA-Z0-9_]{3,20}$/.test(username))
-    return res.status(400).json({ error: "Login 3-20 ta harf, raqam yoki _ bo'lishi kerak" });
-  if (password.length < 8)
-    return res.status(400).json({ error: "Admin paroli kamida 8 ta belgi bo'lsin" });
+  if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) return res.status(400).json({ error: "Login 3-20 ta harf, raqam yoki _ bo'lishi kerak" });
+  if (password.length < 8) return res.status(400).json({ error: "Admin paroli kamida 8 ta belgi bo'lsin" });
   try {
-    await users.insertOne({
-      id: crypto.randomUUID(),
-      username,
-      lower: username.toLowerCase(),
-      hash: bcrypt.hashSync(password, 10),
-      role: 'admin',
-      created: Date.now()
-    });
+    await users.insertOne({ id: crypto.randomUUID(), username, lower: username.toLowerCase(),
+      hash: bcrypt.hashSync(password, 10), role: 'admin', created: Date.now() });
   } catch (e) {
     if (e.code === 11000) return res.status(409).json({ error: 'Bu login band' });
     throw e;
@@ -387,30 +304,24 @@ app.post('/api/admin/users', auth, ownerOnly, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 app.post('/api/admin/users/:id/role', auth, ownerOnly, wrap(async (req, res) => {
-  if (req.params.id === req.user.id)
-    return res.status(400).json({ error: "O'zingizning huquqingizni o'zgartira olmaysiz" });
+  if (req.params.id === req.user.id) return res.status(400).json({ error: "O'zingizning huquqingizni o'zgartira olmaysiz" });
   const role = req.body.role === 'admin' ? 'admin' : 'user';
   await users.updateOne({ id: req.params.id }, { $set: { role } });
   res.json({ ok: true });
 }));
 app.delete('/api/admin/users/:id', auth, ownerOnly, wrap(async (req, res) => {
-  if (req.params.id === req.user.id)
-    return res.status(400).json({ error: "O'zingizni o'chira olmaysiz" });
+  if (req.params.id === req.user.id) return res.status(400).json({ error: "O'zingizni o'chira olmaysiz" });
   const target = await users.findOne({ id: req.params.id });
   if (!target) return res.json({ ok: true });
-  if (target.lower === ADMIN_USER.toLowerCase())
-    return res.status(403).json({ error: "Bosh adminni o'chirib bo'lmaydi" });
-  if (target.role === 'admin' && !req.user.owner)
-    return res.status(403).json({ error: "Adminlarni faqat bosh admin o'chira oladi" });
+  if (target.lower === ADMIN_USER.toLowerCase()) return res.status(403).json({ error: "Bosh adminni o'chirib bo'lmaydi" });
+  if (target.role === 'admin' && !req.user.owner) return res.status(403).json({ error: "Adminlarni faqat bosh admin o'chira oladi" });
   await users.deleteOne({ id: req.params.id });
   await comments.deleteMany({ userId: req.params.id });
   res.json({ ok: true });
 }));
 app.get('/api/admin/comments', auth, ownerOnly, wrap(async (req, res) => {
   const cs = await comments.find({}, { projection: { _id: 0 } }).sort({ created: -1 }).limit(100).toArray();
-  const titles = Object.fromEntries(
-    (await animes.find({}, { projection: { _id: 0, id: 1, title: 1 } }).toArray()).map(a => [a.id, a.title])
-  );
+  const titles = Object.fromEntries((await animes.find({}, { projection: { _id: 0, id: 1, title: 1 } }).toArray()).map(a => [a.id, a.title]));
   res.json(cs.map(c => ({ ...c, anime: titles[c.animeId] || '(o\'chirilgan)' })));
 }));
 
@@ -421,12 +332,8 @@ app.get('/api/genres', auth, wrap(async (req, res) => {
 app.post('/api/genres', auth, ownerOnly, wrap(async (req, res) => {
   const name = String(req.body.name || '').replace(/,/g, ' ').trim().slice(0, 30);
   if (!name) return res.status(400).json({ error: 'Janr nomini kiriting' });
-  try {
-    await genres.insertOne({ id: crypto.randomUUID(), name, lower: name.toLowerCase() });
-  } catch (e) {
-    if (e.code === 11000) return res.status(409).json({ error: 'Bu janr allaqachon bor' });
-    throw e;
-  }
+  try { await genres.insertOne({ id: crypto.randomUUID(), name, lower: name.toLowerCase() }); }
+  catch (e) { if (e.code === 11000) return res.status(409).json({ error: 'Bu janr allaqachon bor' }); throw e; }
   res.json({ ok: true });
 }));
 app.delete('/api/genres/:id', auth, ownerOnly, wrap(async (req, res) => {
@@ -447,8 +354,7 @@ app.get('/api/anime/:id/reactions', auth, wrap(async (req, res) => {
 app.post('/api/anime/:id/react', auth, wrap(async (req, res) => {
   const v = Math.sign(Number(req.body.v)) || 0;
   const f = { animeId: req.params.id, ep: String(req.body.ep || 'main'), userId: req.user.id };
-  if (v === 0) await reactions.deleteOne(f);
-  else await reactions.updateOne(f, { $set: { v } }, { upsert: true });
+  if (v === 0) await reactions.deleteOne(f); else await reactions.updateOne(f, { $set: { v } }, { upsert: true });
   res.json({ ok: true });
 }));
 
@@ -456,14 +362,9 @@ app.post('/api/anime/:id/react', auth, wrap(async (req, res) => {
 app.get('/api/notifications', auth, wrap(async (req, res) => {
   const u = await users.findOne({ id: req.user.id });
   const seen = u.notifSeen || 0;
-  const items = await notifs.find({
-    $or: [{ to: null }, { to: req.user.id }],
-    created: { $gte: u.created || 0 }
-  }, { projection: { _id: 0 } }).sort({ created: -1 }).limit(30).toArray();
-  res.json({
-    items: items.map(n => ({ ...n, unread: n.created > seen })),
-    unread: items.filter(n => n.created > seen).length
-  });
+  const items = await notifs.find({ $or: [{ to: null }, { to: req.user.id }], created: { $gte: u.created || 0 } }, { projection: { _id: 0 } })
+    .sort({ created: -1 }).limit(30).toArray();
+  res.json({ items: items.map(n => ({ ...n, unread: n.created > seen })), unread: items.filter(n => n.created > seen).length });
 }));
 app.post('/api/notifications/seen', auth, wrap(async (req, res) => {
   await users.updateOne({ id: req.user.id }, { $set: { notifSeen: Date.now() } });
@@ -478,10 +379,7 @@ app.post('/api/admin/users/:id/pro', auth, ownerOnly, wrap(async (req, res) => {
   if (!u) return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
   const until = days ? Math.max(Date.now(), u.proUntil || 0) + days * DAY : null;
   await users.updateOne({ id: u.id }, { $set: { proUntil: until } });
-  await notify(
-    days ? 'Sizga Pro obuna berildi: ' + new Date(until).toISOString().slice(0, 10) + ' gacha' : 'Pro obunangiz bekor qilindi',
-    u.id
-  );
+  await notify(days ? 'Sizga Pro obuna berildi: ' + new Date(until).toISOString().slice(0, 10) + ' gacha' : 'Pro obunangiz bekor qilindi', u.id);
   res.json({ ok: true });
 }));
 app.get('/api/admin/promos', auth, ownerOnly, wrap(async (req, res) => {
@@ -492,12 +390,8 @@ app.post('/api/admin/promos', auth, ownerOnly, wrap(async (req, res) => {
     || crypto.randomBytes(4).toString('hex').toUpperCase();
   const days = Math.max(1, Math.min(3650, parseInt(req.body.days) || 30));
   const maxUses = Math.max(1, Math.min(100000, parseInt(req.body.maxUses) || 1));
-  try {
-    await promos.insertOne({ id: crypto.randomUUID(), code, days, maxUses, used: 0, usedBy: [], created: Date.now() });
-  } catch (e) {
-    if (e.code === 11000) return res.status(409).json({ error: 'Bu promo kod allaqachon bor' });
-    throw e;
-  }
+  try { await promos.insertOne({ id: crypto.randomUUID(), code, days, maxUses, used: 0, usedBy: [], created: Date.now() }); }
+  catch (e) { if (e.code === 11000) return res.status(409).json({ error: 'Bu promo kod allaqachon bor' }); throw e; }
   res.json({ ok: true, code });
 }));
 app.delete('/api/admin/promos/:id', auth, ownerOnly, wrap(async (req, res) => {
@@ -508,8 +402,7 @@ app.post('/api/promo/redeem', auth, wrap(async (req, res) => {
   const code = String(req.body.code || '').trim().toUpperCase();
   const p = await promos.findOneAndUpdate(
     { code, usedBy: { $ne: req.user.id }, $expr: { $lt: ['$used', '$maxUses'] } },
-    { $inc: { used: 1 }, $push: { usedBy: req.user.id } }
-  );
+    { $inc: { used: 1 }, $push: { usedBy: req.user.id } });
   if (!p) return res.status(400).json({ error: "Promo kod noto'g'ri, ishlatilgan yoki tugagan" });
   const u = await users.findOne({ id: req.user.id });
   const until = Math.max(Date.now(), u.proUntil || 0) + p.days * DAY;
@@ -527,8 +420,7 @@ app.post('/api/notifications', auth, admin, wrap(async (req, res) => {
 app.delete('/api/notifications/:id', auth, admin, wrap(async (req, res) => {
   const n = await notifs.findOne({ id: req.params.id });
   if (!n) return res.json({ ok: true });
-  if (!req.user.owner && n.by !== req.user.username)
-    return res.status(403).json({ error: "Faqat o'zingiz yuborgan xabarni o'chira olasiz" });
+  if (!req.user.owner && n.by !== req.user.username) return res.status(403).json({ error: "Faqat o'zingiz yuborgan xabarni o'chira olasiz" });
   await notifs.deleteOne({ id: n.id });
   res.json({ ok: true });
 }));
@@ -541,30 +433,50 @@ app.post('/api/admin/plans', auth, ownerOnly, wrap(async (req, res) => {
   const name = String(req.body.name || '').trim().slice(0, 40);
   const price = String(req.body.price || '').trim().slice(0, 40);
   const days = Math.min(3650, parseInt(req.body.days) || 0);
-  if (!name || !price || days < 1)
-    return res.status(400).json({ error: 'Tarif nomi, narxi va muddatini (kun) kiriting' });
-  await tariffs.insertOne({
-    id: crypto.randomUUID(),
-    name,
-    price,
-    days,
-    desc: String(req.body.desc || '').trim().slice(0, 200),
-    created: Date.now()
-  });
+  if (!name || !price || days < 1) return res.status(400).json({ error: 'Tarif nomi, narxi va muddatini (kun) kiriting' });
+  await tariffs.insertOne({ id: crypto.randomUUID(), name, price, days, desc: String(req.body.desc || '').trim().slice(0, 200), created: Date.now() });
   res.json({ ok: true });
 }));
 app.delete('/api/admin/plans/:id', auth, ownerOnly, wrap(async (req, res) => {
   await tariffs.deleteOne({ id: req.params.id });
   res.json({ ok: true });
-}));
+  }));
 
-// Telegram bot: tasdiqlash, menyu, statistika, yordam va anonim admin murojaatlari.
-let telegramOffset = 0;
+// Telegram bot va uch darajali admin boshqaruvi
 let telegramPolling = false;
-const BOT_MENU = {
+let telegramOffset = 0;
+
+const USER_MENU = {
   keyboard: [
-    [{ text: '📩 Adminga murojaat' }, { text: '❓ Yordam' }],
-    [{ text: '📊 Statistika' }]
+    [{ text: '💎 Pro obuna olish' }],
+    [{ text: '📩 Adminga murojaat' }, { text: '❓ Yordam' }]
+  ],
+  resize_keyboard: true
+};
+const OWNER_MENU = {
+  keyboard: [
+    [{ text: '📊 Statistika' }, { text: '👥 Foydalanuvchilar' }],
+    [{ text: '💳 To‘lov sozlamalari' }, { text: '💎 Tariflar' }],
+    [{ text: '📢 E’lon yuborish' }],
+    [{ text: '🛡 Adminlar' }, { text: '🚫 Bloklash' }],
+    [{ text: '💎 Pro obuna olish' }, { text: '📩 Adminga murojaat' }]
+  ],
+  resize_keyboard: true
+};
+const MAIN_MENU = {
+  keyboard: [
+    [{ text: '📊 Statistika' }, { text: '👥 Foydalanuvchilar' }],
+    [{ text: '💳 To‘lov sozlamalari' }, { text: '💎 Tariflar' }],
+    [{ text: '📢 E’lon yuborish' }],
+    [{ text: '💎 Pro obuna olish' }, { text: '📩 Adminga murojaat' }]
+  ],
+  resize_keyboard: true
+};
+const ORDINARY_MENU = {
+  keyboard: [
+    [{ text: '📊 Statistika' }],
+    [{ text: '💎 Pro obuna olish' }, { text: '📩 Adminga murojaat' }],
+    [{ text: '❓ Yordam' }]
   ],
   resize_keyboard: true
 };
@@ -576,196 +488,599 @@ async function telegramApi(method, payload) {
     body: JSON.stringify(payload)
   });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok || !data.ok)
-    throw new Error(`Telegram ${method} xatosi: ${data.description || r.status}`);
+  if (!r.ok || !data.ok) throw new Error(`Telegram ${method} xatosi: ${data.description || r.status}`);
   return data.result;
 }
-
 async function telegramSend(chatId, text, extra = {}) {
   return telegramApi('sendMessage', { chat_id: chatId, text, ...extra });
 }
-
 function displayTelegramUser(from) {
   return from.username ? '@' + from.username : (from.first_name || 'Telegram foydalanuvchisi');
+}
+async function adminInfo(chatId) {
+  if (ADMIN_TELEGRAM_ID && String(chatId) === ADMIN_TELEGRAM_ID)
+    return { level: 'owner', label: 'Owner' };
+  return telegramAdmins.findOne({ chatId: String(chatId), active: true });
+}
+function menuFor(role) {
+  return role?.level === 'owner' ? OWNER_MENU :
+    role?.level === 'main' ? MAIN_MENU :
+    role?.level === 'ordinary' ? ORDINARY_MENU : USER_MENU;
+}
+async function logAdmin(chatId, action, details = '') {
+  await adminLogs.insertOne({
+    chatId: String(chatId),
+    action,
+    details: String(details).slice(0, 500),
+    created: Date.now()
+  });
+}
+async function activeAdmins(includeOrdinary = true) {
+  const ids = ADMIN_TELEGRAM_ID ? [ADMIN_TELEGRAM_ID] : [];
+  const levels = includeOrdinary ? ['main', 'ordinary'] : ['main'];
+  const rows = await telegramAdmins.find({ active: true, level: { $in: levels } }).toArray();
+  for (const a of rows) if (!ids.includes(a.chatId)) ids.push(a.chatId);
+  return ids;
+}
+async function showBotPlans(chatId) {
+  const linked = await users.findOne({ telegramChatId: String(chatId) });
+  if (!linked) return telegramSend(chatId,
+    'Pro obuna olish uchun avval saytda ro‘yxatdan o‘ting va Telegram hisobingizni bot orqali tasdiqlang.',
+    { reply_markup: USER_MENU });
+  const list = await tariffs.find({}).sort({ days: 1 }).toArray();
+  if (!list.length) return telegramSend(chatId, 'Hozircha obuna tariflari mavjud emas.', { reply_markup: USER_MENU });
+  await telegramApi('sendMessage', {
+    chat_id: chatId,
+    text: '💎 Pro obuna tariflaridan birini tanlang:',
+    reply_markup: {
+      inline_keyboard: list.map(p => [{
+        text: `${p.name} — ${p.price}`,
+        callback_data: `buyplan:${p.id}`
+      }])
+    }
+  });
+}
+async function showStats(chatId) {
+  const total = await users.countDocuments({ role: 'user' });
+  const admins = await telegramAdmins.countDocuments({ active: true }) + (ADMIN_TELEGRAM_ID ? 1 : 0);
+  const pending = await pendingRegs.countDocuments({ expires: { $gt: Date.now() } });
+  const paymentsPending = await payments.countDocuments({ status: 'pending' });
+  await telegramSend(chatId,
+    `📊 Bot statistikasi\n\n👥 Foydalanuvchilar: ${total}\n🛡 Adminlar: ${admins}\n⏳ Tasdiqlash kutilmoqda: ${pending}\n🧾 Tekshiriladigan to‘lovlar: ${paymentsPending}`);
 }
 
 async function pollTelegram() {
   if (!TELEGRAM_BOT_TOKEN || telegramPolling) return;
   telegramPolling = true;
   try {
-    const r = await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?timeout=25&offset=${telegramOffset}`
-    );
+    const r = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?timeout=25&offset=${telegramOffset}`);
     const data = await r.json();
-    if (data.ok && Array.isArray(data.result)) {
-      for (const update of data.result) {
-        telegramOffset = update.update_id + 1;
-        const msg = update.message;
-        if (!msg || !msg.chat || !msg.text) continue;
-        const chatId = String(msg.chat.id);
-        const text = msg.text.trim();
-        const isAdmin = ADMIN_TELEGRAM_ID && chatId === ADMIN_TELEGRAM_ID;
+    if (data.ok && Array.isArray(data.result)) for (const update of data.result) {
+      telegramOffset = update.update_id + 1;
 
-        // Foydalanuvchi o'z Telegram ID raqamini bilishi uchun.
-        if (text === '/id') {
-          await telegramSend(chatId, `Telegram ID raqamingiz: ${chatId}`);
-          continue;
-        }
+      if (update.callback_query) {
+        const q = update.callback_query;
+        const chatId = String(q.message?.chat?.id || '');
+        const role = await adminInfo(chatId);
 
-        // Admin murojaat xabariga Reply qilsa, javob anonim yetkaziladi.
-        if (isAdmin && msg.reply_to_message) {
-          const link = await botReplies.findOne({
-            adminMessageId: msg.reply_to_message.message_id
-          });
-          if (link) {
-            await telegramSend(
-              link.userChatId,
-              `💬 Adminning javobi:\n\n${text}`,
-              { reply_markup: BOT_MENU }
-            );
-            await telegramSend(chatId, '✅ Javob foydalanuvchiga anonim tarzda yuborildi.');
-            continue;
-          }
-        }
-
-        if (text.startsWith('/start')) {
-          const match = text.match(/^\/start\s+([a-f0-9]{36})$/i);
-          if (match) {
-            const pending = await pendingRegs.findOne({
-              nonce: match[1],
-              expires: { $gt: Date.now() }
+        if (/^(payok|payno):/.test(q.data || '')) {
+          if (!role || !['owner', 'main'].includes(role.level)) {
+            await telegramApi('answerCallbackQuery', {
+              callback_query_id: q.id,
+              text: 'Bu amal uchun ruxsat yo‘q.'
             });
-            if (!pending) {
-              await telegramSend(
-                chatId,
-                'Bu tasdiqlash havolasi eskirgan. Saytga qaytib, qaytadan ro‘yxatdan o‘tishni boshlang.',
-                { reply_markup: BOT_MENU }
-              );
-              continue;
-            }
-            const actual = pending.codeForBot || null;
-            if (!actual) {
-              await telegramSend(
-                chatId,
-                'Kod yuborilmadi. Sayt orqali qaytadan ro‘yxatdan o‘tishni boshlang.',
-                { reply_markup: BOT_MENU }
-              );
-              continue;
-            }
-            await pendingRegs.updateOne({ nonce: pending.nonce }, { $set: { chatId } });
-            const usernameText = displayTelegramUser(msg.from || {});
-            await telegramSend(
-              chatId,
-              `Assalomu alaykum! 👋\n\nTelegram foydalanuvchisi: ${usernameText}\n\nSaytingiz uchun tasdiqlash kodingiz: ${actual}`,
-              { reply_markup: BOT_MENU }
-            );
             continue;
           }
-          await telegramSend(
-            chatId,
-            'Assalomu alaykum! 👋\n\nVerification botiga xush kelibsiz. Quyidagi menyudan kerakli bo‘limni tanlang.',
-            { reply_markup: BOT_MENU }
-          );
-          continue;
-        }
 
-        if (isAdmin && (text === '📊 Statistika' || text === '/stats')) {
-          const total = await users.countDocuments({ role: 'user' });
-          const admins = await users.countDocuments({ role: 'admin' });
-          const pending = await pendingRegs.countDocuments({ expires: { $gt: Date.now() } });
-          await telegramSend(
-            chatId,
-            `📊 Bot statistikasi\n\n👥 Ro‘yxatdan o‘tgan foydalanuvchilar: ${total}\n🛡 Adminlar: ${admins}\n⏳ Kutilayotgan tasdiqlashlar: ${pending}`,
-            { reply_markup: BOT_MENU }
-          );
-          continue;
-        }
-        if (text === '📊 Statistika' || text === '/stats') {
-          await telegramSend(
-            chatId,
-            'Statistikani faqat bot administratori ko‘ra oladi.',
-            { reply_markup: BOT_MENU }
-          );
-          continue;
-        }
-
-        if (text === '❓ Yordam' || text === '/help') {
-          await telegramSend(
-            chatId,
-            '❓ Yordam\n\n• Saytda ro‘yxatdan o‘tish uchun saytdagi maxsus Telegram havolasini oching.\n• Bot yuborgan 6 xonali kodni saytdagi tasdiqlash oynasiga kiriting.\n• Muammo bo‘lsa, “📩 Adminga murojaat” bo‘limidan xabar yuboring.',
-            { reply_markup: BOT_MENU }
-          );
-          continue;
-        }
-
-        if (text === '📩 Adminga murojaat' || text === '/contact') {
-          await botReplies.updateOne(
-            { userChatId: chatId },
-            { $set: { waitingForMessage: true, updated: Date.now() } },
-            { upsert: true }
-          );
-          await telegramSend(
-            chatId,
-            '✉️ Xabaringizni shu yerga yozib yuboring. Men uni adminga anonim tarzda yetkazaman.',
-            { reply_markup: BOT_MENU }
-          );
-          continue;
-        }
-
-        // Admin bo'lmagan foydalanuvchining keyingi xabari murojaat sifatida yuboriladi.
-        const contactState = await botReplies.findOne({
-          userChatId: chatId,
-          waitingForMessage: true
-        });
-        if (contactState) {
-          if (!ADMIN_TELEGRAM_ID) {
-            await telegramSend(
-              chatId,
-              'Hozircha admin manzili sozlanmagan. Keyinroq urinib ko‘ring.',
-              { reply_markup: BOT_MENU }
-            );
+          const [action, paymentId] = q.data.split(':');
+          const payment = await payments.findOne({ id: paymentId, status: 'pending' });
+          if (!payment) {
+            await telegramApi('answerCallbackQuery', {
+              callback_query_id: q.id,
+              text: 'To‘lov allaqachon ko‘rib chiqilgan.'
+            });
             continue;
           }
-          const forwarded = await telegramSend(
-            ADMIN_TELEGRAM_ID,
-            `📩 Yangi anonim murojaat\nFoydalanuvchi: ${displayTelegramUser(msg.from || {})}\nChat ID: ${chatId}\n\nXabar:\n${text}\n\nJavob berish uchun shu xabarga Reply qiling.`
-          );
-          await botReplies.updateOne(
-            { userChatId: chatId },
-            {
-              $set: {
-                waitingForMessage: false,
-                lastAdminMessageId: forwarded.message_id,
-                updated: Date.now()
+
+          if (action === 'payok') {
+            const days = Number(payment.days || (await tariffs.findOne({ id: payment.planId }))?.days || 0);
+            if (!days) {
+              await telegramApi('answerCallbackQuery', {
+                callback_query_id: q.id,
+                text: 'Tarif muddati topilmadi.'
+              });
+              continue;
+            }
+            const result = await payments.updateOne(
+              { id: paymentId, status: 'pending' },
+              { $set: { status: 'approved', reviewed: Date.now(), reviewedBy: chatId } }
+            );
+            if (!result.modifiedCount) {
+              await telegramApi('answerCallbackQuery', {
+                callback_query_id: q.id,
+                text: 'Boshqa admin avval ko‘rib chiqdi.'
+              });
+              continue;
+            }
+
+            let code;
+            for (let i = 0; i < 5; i++) {
+              code = 'PRO-' + crypto.randomBytes(5).toString('hex').toUpperCase();
+              try {
+                await promos.insertOne({
+                  id: crypto.randomUUID(),
+                  code,
+                  days,
+                  maxUses: 1,
+                  used: 0,
+                  usedBy: [],
+                  created: Date.now(),
+                  source: 'telegram-payment'
+                });
+                break;
+              } catch (e) {
+                if (e.code !== 11000 || i === 4) throw e;
               }
             }
-          );
-          await botReplies.insertOne({
-            adminMessageId: forwarded.message_id,
-            userChatId: chatId,
-            created: Date.now()
+            await payments.updateOne({ id: paymentId }, { $set: { promoCode: code } });
+            await telegramSend(payment.chatId,
+              `✅ To‘lovingiz tasdiqlandi!\n\nTarif: ${payment.planName}\nMuddat: ${days} kun\n\n🎟 Promo-kodingiz: ${code}\n\nSaytdagi Obuna bo‘limida kodni faollashtiring. Kod bir marta ishlatiladi.`,
+              { reply_markup: USER_MENU });
+            await logAdmin(chatId, 'payment_approved', paymentId);
+          } else {
+            const result = await payments.updateOne(
+              { id: paymentId, status: 'pending' },
+              { $set: { status: 'rejected', reviewed: Date.now(), reviewedBy: chatId } }
+            );
+            if (!result.modifiedCount) {
+              await telegramApi('answerCallbackQuery', {
+                callback_query_id: q.id,
+                text: 'Boshqa admin avval ko‘rib chiqdi.'
+              });
+              continue;
+            }
+            await telegramSend(payment.chatId,
+              '❌ To‘lov chekingiz rad etildi. Chek va summani tekshirib, qayta yuboring yoki adminga murojaat qiling.',
+              { reply_markup: USER_MENU });
+            await logAdmin(chatId, 'payment_rejected', paymentId);
+          }
+
+          await telegramApi('editMessageReplyMarkup', {
+            chat_id: chatId,
+            message_id: q.message.message_id,
+            reply_markup: { inline_keyboard: [] }
           });
-          await telegramSend(
-            chatId,
-            '✅ Xabaringiz adminga yuborildi. Javob kelganda shu bot orqali anonim tarzda olasiz.',
-            { reply_markup: BOT_MENU }
-          );
+          await telegramApi('answerCallbackQuery', {
+            callback_query_id: q.id,
+            text: action === 'payok' ? 'Tasdiqlandi.' : 'Rad etildi.'
+          });
           continue;
         }
 
-        if (isAdmin) {
-          await telegramSend(
+        const [kind, planId] = String(q.data || '').split(':');
+        if (kind === 'buyplan') {
+          const user = await users.findOne({ telegramChatId: chatId });
+          const plan = await tariffs.findOne({ id: planId });
+          if (!user || !plan) {
+            await telegramApi('answerCallbackQuery', {
+              callback_query_id: q.id,
+              text: 'Hisob yoki tarif topilmadi.'
+            });
+            continue;
+          }
+          const setting = await botSettings.findOne({ key: 'paymentDetails' });
+          const payment = {
+            id: crypto.randomUUID(),
+            userId: user.id,
+            username: user.username,
             chatId,
-            'Admin menyusi. Statistikani ko‘rish uchun “📊 Statistika” tugmasini bosing. Foydalanuvchiga javob berish uchun uning murojaat xabariga Reply qiling.',
-            { reply_markup: BOT_MENU }
-          );
-        } else {
-          await telegramSend(
-            chatId,
-            'Menyudan bo‘lim tanlang. Ro‘yxatdan o‘tish kodini olish uchun saytdagi maxsus havolani oching.',
-            { reply_markup: BOT_MENU }
-          );
+            planId: plan.id,
+            planName: plan.name,
+            price: plan.price,
+            days: plan.days,
+            status: 'waiting_receipt',
+            created: Date.now()
+          };
+          await payments.insertOne(payment);
+          await telegramSend(chatId,
+            `📦 Tarif: ${plan.name}\n💰 Narxi: ${plan.price}\n⏳ Muddati: ${plan.days} kun\n\n💳 To‘lov ma’lumotlari:\n${setting?.value || 'To‘lov rekvizitlari hali sozlanmagan. Adminga murojaat qiling.'}\n\nTo‘lovdan so‘ng chek rasmini shu chatga yuboring.`,
+            { reply_markup: USER_MENU });
+          await telegramApi('answerCallbackQuery', {
+            callback_query_id: q.id,
+            text: 'Tarif tanlandi.'
+          });
         }
+        continue;
+      }
+
+      const msg = update.message;
+      if (!msg?.chat) continue;
+      const chatId = String(msg.chat.id);
+      const text = String(msg.text || msg.caption || '').trim();
+      const role = await adminInfo(chatId);
+      const isAdmin = !!role;
+      const owner = role?.level === 'owner';
+      const manager = ['owner', 'main'].includes(role?.level);
+      const blocked = await blockedUsers.findOne({ chatId, active: true });
+      if (blocked && !owner) {
+        await telegramSend(chatId, '⛔ Botdan foydalanishingiz cheklangan.');
+        continue;
+      }
+
+      // Admin xabariga Reply qilinganda anonim javob yuborish.
+      if (isAdmin && msg.reply_to_message) {
+        const reply = await botReplies.findOne({
+          adminMessageId: msg.reply_to_message.message_id
+        });
+        if (reply) {
+          await telegramSend(reply.userChatId, `📩 Admin javobi:\n\n${text}`);
+          await logAdmin(chatId, 'reply_contact', reply.userChatId);
+          await telegramSend(chatId, '✅ Javob foydalanuvchiga yuborildi.');
+          continue;
+        }
+      }
+
+      if (owner && text.startsWith('/addmain ')) {
+        const id = text.split(/\s+/)[1];
+        if (!/^\d+$/.test(id) || id === ADMIN_TELEGRAM_ID) {
+          await telegramSend(chatId, 'ID noto‘g‘ri.');
+          continue;
+        }
+        await telegramAdmins.updateOne(
+          { chatId: id },
+          { $set: { chatId: id, level: 'main', active: true, addedBy: chatId, updated: Date.now() } },
+          { upsert: true }
+        );
+        await logAdmin(chatId, 'add_main_admin', id);
+        await telegramSend(chatId, `✅ ${id} Main Admin qilindi.`);
+        continue;
+      }
+
+      if (owner && text.startsWith('/addadmin ')) {
+        const id = text.split(/\s+/)[1];
+        if (!/^\d+$/.test(id) || id === ADMIN_TELEGRAM_ID) {
+          await telegramSend(chatId, 'ID noto‘g‘ri.');
+          continue;
+        }
+        await telegramAdmins.updateOne(
+          { chatId: id },
+          { $set: { chatId: id, level: 'ordinary', active: true, addedBy: chatId, updated: Date.now() } },
+          { upsert: true }
+        );
+        await logAdmin(chatId, 'add_ordinary_admin', id);
+        await telegramSend(chatId, `✅ ${id} Oddiy Admin qilindi.`);
+        continue;
+      }
+
+      if (owner && text.startsWith('/removeadmin ')) {
+        const id = text.split(/\s+/)[1];
+        if (id === ADMIN_TELEGRAM_ID) {
+          await telegramSend(chatId, 'Owner huquqini bu buyruq bilan olib bo‘lmaydi.');
+          continue;
+        }
+        await telegramAdmins.updateOne({ chatId: id }, { $set: { active: false, updated: Date.now() } });
+        await logAdmin(chatId, 'remove_admin', id);
+        await telegramSend(chatId, `✅ ${id} adminlikdan olindi.`);
+        continue;
+      }
+
+      if (owner && text.startsWith('/block ')) {
+        const id = text.split(/\s+/)[1];
+        if (!/^\d+$/.test(id) || id === ADMIN_TELEGRAM_ID) {
+          await telegramSend(chatId, 'ID noto‘g‘ri yoki Owner bloklanmaydi.');
+          continue;
+        }
+        await blockedUsers.updateOne(
+          { chatId: id },
+          { $set: { chatId: id, active: true, blockedBy: chatId, created: Date.now() } },
+          { upsert: true }
+        );
+        await logAdmin(chatId, 'block_user', id);
+        await telegramSend(chatId, `🚫 ${id} bloklandi.`);
+        continue;
+      }
+
+      if (owner && text.startsWith('/unblock ')) {
+        const id = text.split(/\s+/)[1];
+        await blockedUsers.updateOne({ chatId: id }, { $set: { active: false } });
+        await logAdmin(chatId, 'unblock_user', id);
+        await telegramSend(chatId, `✅ ${id} blokdan chiqarildi.`);
+        continue;
+      }
+
+      const waitingPay = manager ? await botSettings.findOne({
+        key: 'waitingPaymentDetails',
+        value: true,
+        ownerChatId: chatId
+      }) : null;
+      if (waitingPay && text) {
+        await botSettings.updateOne(
+          { key: 'paymentDetails' },
+          { $set: { value: text, updated: Date.now() } },
+          { upsert: true }
+        );
+        await botSettings.updateOne(
+          { key: 'waitingPaymentDetails', ownerChatId: chatId },
+          { $set: { value: false } }
+        );
+        await logAdmin(chatId, 'update_payment_details');
+        await telegramSend(chatId, '✅ To‘lov rekvizitlari saqlandi.');
+        continue;
+      }
+
+      if (manager && (text === '💳 To‘lov sozlamalari' || text === '/setpayment')) {
+        await botSettings.updateOne(
+          { key: 'waitingPaymentDetails', ownerChatId: chatId },
+          { $set: { value: true, ownerChatId: chatId } },
+          { upsert: true }
+        );
+        await telegramSend(chatId, 'Yangi to‘lov rekvizitlarini bitta xabar qilib yuboring.');
+        continue;
+      }
+
+      if (manager && (text === '💎 Tariflar' || text === '/plansadmin')) {
+        const list = await tariffs.find({}).sort({ days: 1 }).toArray();
+        await telegramSend(chatId,
+          `Tariflar:\n${list.map(p => `${p.name} — ${p.price} — ${p.days} kun (ID: ${p.id})`).join('\n') || 'Hozircha tarif yo‘q'}\n\nYangi tarif: /addplan Nomi | Narxi | Kun\nTahrirlash: /editplan ID | Yangi nom | Yangi narx | Kun\nO‘chirish: /delplan ID`);
+        continue;
+      }
+
+      if (manager && text.startsWith('/addplan ')) {
+        const parts = text.slice(9).split('|').map(x => x.trim());
+        const days = Number(parts[2]);
+        if (parts.length < 3 || !parts[0] || !parts[1] || !Number.isInteger(days) || days < 1 || days > 3650) {
+          await telegramSend(chatId, 'Format: /addplan Nomi | Narxi | Kun');
+          continue;
+        }
+        const p = {
+          id: crypto.randomUUID(),
+          name: parts[0].slice(0, 40),
+          price: parts[1].slice(0, 40),
+          days,
+          created: Date.now()
+        };
+        await tariffs.insertOne(p);
+        await logAdmin(chatId, 'add_plan', `${p.name};${p.price};${days}`);
+        await telegramSend(chatId, '✅ Tarif qo‘shildi.');
+        continue;
+      }
+
+      if (manager && text.startsWith('/delplan ')) {
+        const id = text.slice(9).trim();
+        await tariffs.deleteOne({ id });
+        await logAdmin(chatId, 'delete_plan', id);
+        await telegramSend(chatId, '✅ Tarif o‘chirildi.');
+        continue;
+      }
+
+      if (manager && text.startsWith('/editplan ')) {
+        const parts = text.slice(10).split('|').map(x => x.trim());
+        const days = Number(parts[3]);
+        if (parts.length < 4 || !parts[0] || !parts[1] || !parts[2] || !Number.isInteger(days) || days < 1 || days > 3650) {
+          await telegramSend(chatId, 'Format: /editplan ID | Yangi nom | Yangi narx | Kun');
+          continue;
+        }
+        const result = await tariffs.updateOne(
+          { id: parts[0] },
+          { $set: { name: parts[1].slice(0, 40), price: parts[2].slice(0, 40), days, updated: Date.now() } }
+        );
+        if (result.matchedCount) {
+          await logAdmin(chatId, 'edit_plan', parts.join('|'));
+          await telegramSend(chatId, '✅ Tarif yangilandi.');
+        } else {
+          await telegramSend(chatId, 'Bunday tarif ID topilmadi.');
+        }
+        continue;
+      }
+
+      if (manager && (text === '📢 E’lon yuborish' || text === '/announce')) {
+        await botSettings.updateOne(
+          { key: 'waitingAnnouncement', ownerChatId: chatId },
+          { $set: { value: true } },
+          { upsert: true }
+        );
+        await telegramSend(chatId, 'Barcha foydalanuvchilarga yuboriladigan e’lon matnini yuboring.');
+        continue;
+      }
+
+      const waitingAnn = manager ? await botSettings.findOne({
+        key: 'waitingAnnouncement',
+        ownerChatId: chatId,
+        value: true
+      }) : null;
+      if (waitingAnn && text) {
+        const targets = await users.find(
+          { telegramChatId: { $exists: true, $ne: null } },
+          { projection: { telegramChatId: 1 } }
+        ).toArray();
+        let sent = 0;
+        for (const u of targets) {
+          try {
+            await telegramSend(u.telegramChatId, `📢 E’LON\n\n${text}`);
+            sent++;
+          } catch (e) {
+            console.error('E’lon yuborilmadi:', e.message);
+          }
+        }
+        await botSettings.updateOne(
+          { key: 'waitingAnnouncement', ownerChatId: chatId },
+          { $set: { value: false } }
+        );
+        await logAdmin(chatId, 'announcement', `sent:${sent}`);
+        await telegramSend(chatId, `✅ E’lon ${sent} ta foydalanuvchiga yuborildi.`);
+        continue;
+      }
+
+      if (owner && text === '🛡 Adminlar') {
+        const rows = await telegramAdmins.find({ active: true }).toArray();
+        await telegramSend(chatId,
+          `Adminlar:\n${rows.map(a => `${a.level === 'main' ? 'Main Admin' : 'Oddiy Admin'}: ${a.chatId}`).join('\n') || 'Qo‘shimcha admin yo‘q'}\n\nQo‘shish: /addmain ID yoki /addadmin ID\nO‘chirish: /removeadmin ID`);
+        continue;
+      }
+
+      if (manager && (text === '👥 Foydalanuvchilar' || text === '/users')) {
+        const rows = await users.find(
+          { role: 'user' },
+          { projection: { username: 1, telegramChatId: 1, created: 1 } }
+        ).sort({ created: -1 }).limit(30).toArray();
+        await telegramSend(chatId,
+          `Oxirgi ${rows.length} foydalanuvchi:\n${rows.map(u => `${u.username} — ${u.telegramChatId || 'Telegram ulanmagan'}`).join('\n') || 'Foydalanuvchi yo‘q'}`);
+        continue;
+      }
+
+      if (owner && text === '🚫 Bloklash') {
+        await telegramSend(chatId, 'Bloklash: /block TELEGRAM_ID\nBlokdan chiqarish: /unblock TELEGRAM_ID');
+        continue;
+      }
+
+      // To'lov cheki rasmini Owner va Main Adminlarga uzatish.
+      if (!isAdmin && ((msg.photo?.length) || (msg.document && String(msg.document.mime_type || '').startsWith('image/')))) {
+        const pendingPayment = await payments.findOne(
+          { chatId, status: 'waiting_receipt' },
+          { sort: { created: -1 } }
+        );
+        if (pendingPayment) {
+          const reviewers = await activeAdmins(false);
+          if (!reviewers.length) {
+            await telegramSend(chatId, 'Admin sozlanmagan. Keyinroq urinib ko‘ring.');
+            continue;
+          }
+          const caption = `🧾 PRO OBUNA TO‘LOVI\nFoydalanuvchi: ${pendingPayment.username}\nTarif: ${pendingPayment.planName}\nNarx: ${pendingPayment.price}\nMuddat: ${pendingPayment.days} kun\nID: ${pendingPayment.id}`;
+          await payments.updateOne(
+            { id: pendingPayment.id },
+            { $set: { status: 'pending', receiptAt: Date.now() } }
+          );
+          for (const reviewer of reviewers) {
+            try {
+              const copied = await telegramApi('copyMessage', {
+                chat_id: reviewer,
+                from_chat_id: chatId,
+                message_id: msg.message_id,
+                caption,
+                reply_markup: {
+                  inline_keyboard: [[
+                    { text: '✅ Tasdiqlash', callback_data: `payok:${pendingPayment.id}` },
+                    { text: '❌ Rad etish', callback_data: `payno:${pendingPayment.id}` }
+                  ]]
+                }
+              });
+              await payments.updateOne(
+                { id: pendingPayment.id },
+                { $addToSet: { reviewerMessageIds: { chatId: reviewer, messageId: copied.message_id } } }
+              );
+            } catch (e) {
+              console.error('Chek adminlarga yuborilmadi:', e.message);
+            }
+          }
+          await telegramSend(chatId,
+            '✅ Chekingiz adminlarga yuborildi. Tekshirilgach, natija shu botga keladi.',
+            { reply_markup: USER_MENU });
+        } else {
+          await telegramSend(chatId, 'Avval 💎 Pro obuna olish bo‘limidan tarif tanlang.');
+        }
+        continue;
+      }
+
+      if (text.startsWith('/start')) {
+        const match = text.match(/^\/start\s+([a-f0-9]{36})$/i);
+        if (match) {
+          const pending = await pendingRegs.findOne({
+            nonce: match[1],
+            expires: { $gt: Date.now() }
+          });
+          if (!pending?.codeForBot) {
+            await telegramSend(chatId,
+              'Tasdiqlash havolasi eskirgan. Saytda qaytadan ro‘yxatdan o‘tishni boshlang.',
+              { reply_markup: USER_MENU });
+            continue;
+          }
+          await pendingRegs.updateOne({ nonce: pending.nonce }, { $set: { chatId } });
+          await telegramSend(chatId,
+            `Assalomu alaykum! 👋\n\nTelegram foydalanuvchisi: ${displayTelegramUser(msg.from || {})}\n\nSaytingiz uchun tasdiqlash kodingiz: ${pending.codeForBot}`,
+            { reply_markup: menuFor(role) });
+          continue;
+        }
+        if (/^\/start\s+pro$/i.test(text)) {
+          await showBotPlans(chatId);
+          continue;
+        }
+        await telegramSend(chatId,
+          'Assalomu alaykum! 👋\nVerification botiga xush kelibsiz.',
+          { reply_markup: menuFor(role) });
+        continue;
+      }
+
+      if ((text === '📊 Statistika' || text === '/stats') && isAdmin) {
+        await showStats(chatId);
+        continue;
+      }
+      if ((text === '📊 Statistika' || text === '/stats') && !isAdmin) {
+        await telegramSend(chatId, 'Bu bo‘lim faqat adminlar uchun.', { reply_markup: USER_MENU });
+        continue;
+      }
+      if (text === '💎 Pro obuna olish' || text === '/plans') {
+        await showBotPlans(chatId);
+        continue;
+      }
+      if (text === '❓ Yordam' || text === '/help') {
+        await telegramSend(chatId,
+          '❓ Yordam\n\n• Saytda ro‘yxatdan o‘tish uchun Telegram havolasini oching.\n• Bot yuborgan 6 xonali kodni saytga kiriting.\n• Pro obuna uchun “💎 Pro obuna olish” tugmasini bosing.\n• Muammo bo‘lsa “📩 Adminga murojaat” bo‘limidan yozing.',
+          { reply_markup: menuFor(role) });
+        continue;
+      }
+      if (text === '📩 Adminga murojaat' || text === '/contact') {
+        await botReplies.updateOne(
+          { userChatId: chatId },
+          { $set: { waitingForMessage: true, updated: Date.now() } },
+          { upsert: true }
+        );
+        await telegramSend(chatId,
+          '✉️ Xabaringizni shu yerga yozing. U adminlarga anonim tarzda yetkaziladi.',
+          { reply_markup: menuFor(role) });
+        continue;
+      }
+
+      const contactState = await botReplies.findOne({
+        userChatId: chatId,
+        waitingForMessage: true
+      });
+      if (contactState && !isAdmin) {
+        const reviewers = await activeAdmins(true);
+        if (!reviewers.length) {
+          await telegramSend(chatId, 'Hozircha admin manzili sozlanmagan.');
+          continue;
+        }
+        let sent = 0;
+        for (const reviewer of reviewers) {
+          try {
+            const f = await telegramSend(reviewer,
+              `📩 Yangi anonim murojaat\nFoydalanuvchi: ${displayTelegramUser(msg.from || {})}\nChat ID: ${chatId}\n\nXabar:\n${text}\n\nJavob berish uchun shu xabarga Reply qiling.`);
+            await botReplies.insertOne({
+              adminMessageId: f.message_id,
+              userChatId: chatId,
+              created: Date.now()
+            });
+            sent++;
+          } catch (e) {
+            console.error('Murojaat yuborilmadi:', e.message);
+          }
+        }
+        await botReplies.updateOne(
+          { userChatId: chatId },
+          { $set: { waitingForMessage: false, updated: Date.now() } }
+        );
+        await telegramSend(chatId,
+          `✅ Xabaringiz ${sent} ta admin chatiga yuborildi. Javob shu bot orqali keladi.`,
+          { reply_markup: USER_MENU });
+        continue;
+      }
+
+      if (isAdmin) {
+        await telegramSend(chatId,
+          `Sizning darajangiz: ${role.level === 'owner' ? 'Owner' : role.level === 'main' ? 'Main Admin' : 'Oddiy Admin'}. Menyudan bo‘lim tanlang.`,
+          { reply_markup: menuFor(role) });
+      } else {
+        await telegramSend(chatId, 'Menyudan kerakli bo‘limni tanlang.', { reply_markup: USER_MENU });
       }
     }
   } catch (e) {
@@ -780,88 +1095,43 @@ async function pollTelegram() {
   const client = new MongoClient(MONGODB_URI);
   await client.connect();
   const db = client.db('animexona');
-
   users = db.collection('users');
   animes = db.collection('anime');
   comments = db.collection('comments');
   genres = db.collection('genres');
   reactions = db.collection('reactions');
-  notifs = db.collection('notifs');
+  notifs = db.collection('notifications');
   promos = db.collection('promos');
-  tariffs = db.collection('tariffs');
+  tariffs = db.collection('plans');
   pendingRegs = db.collection('pendingRegs');
   botReplies = db.collection('botReplies');
-
-  await pendingRegs.createIndex({ nonce: 1 }, { unique: true });
-  await botReplies.createIndex({ adminMessageId: 1 });
-  await botReplies.createIndex({ userChatId: 1 });
-  await promos.createIndex({ code: 1 }, { unique: true });
-  await genres.createIndex({ lower: 1 }, { unique: true });
-
-  const meta = db.collection('meta');
-
-  if (!(await meta.findOne({ k: 'genres' }))) {
-    await meta.insertOne({ k: 'genres' });
-    for (const n of ['Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Romance', 'Sci-Fi', 'Samuray']) {
-      await genres.updateOne(
-        { lower: n.toLowerCase() },
-        { $setOnInsert: { id: crypto.randomUUID(), name: n, lower: n.toLowerCase() } },
-        { upsert: true }
-      );
-    }
-  }
-
-  if (!(await meta.findOne({ k: 'cats-v2' }))) {
-    await meta.insertOne({ k: 'cats-v2' });
-    await genres.deleteMany({
-      lower: { $in: ['action', 'adventure', 'comedy', 'drama', 'fantasy', 'romance', 'sci-fi', 'samuray'] }
-    });
-    for (const n of [
-      'Python',
-      'JavaScript',
-      'Web dasturlash',
-      'Mobil ilovalar',
-      "Ma'lumotlar bazasi",
-      'Algoritmlar',
-      "Sun'iy intellekt",
-      'Boshlang‘ich'
-    ]) {
-      await genres.updateOne(
-        { lower: n.toLowerCase() },
-        { $setOnInsert: { id: crypto.randomUUID(), name: n, lower: n.toLowerCase() } },
-        { upsert: true }
-      );
-    }
-  }
+  payments = db.collection('payments');
+  botSettings = db.collection('botSettings');
+  telegramAdmins = db.collection('telegramAdmins');
+  blockedUsers = db.collection('blockedUsers');
+  adminLogs = db.collection('adminLogs');
 
   await users.createIndex({ lower: 1 }, { unique: true });
+  await genres.createIndex({ lower: 1 }, { unique: true });
+  await promos.createIndex({ code: 1 }, { unique: true });
+  await botReplies.createIndex({ adminMessageId: 1 });
+  await payments.createIndex({ id: 1 }, { unique: true });
+  await telegramAdmins.createIndex({ chatId: 1 }, { unique: true });
+  await blockedUsers.createIndex({ chatId: 1 }, { unique: true });
 
-  // Admin akkaunt har ishga tushganda tekshiriladi (parol o'zgarsa yangilanadi).
   await users.updateOne(
     { lower: ADMIN_USER.toLowerCase() },
-    {
-      $set: {
-        username: ADMIN_USER,
-        hash: bcrypt.hashSync(ADMIN_PASS, 10),
-        role: 'admin'
-      },
-      $setOnInsert: { id: crypto.randomUUID() }
-    },
+    { $set: { username: ADMIN_USER, lower: ADMIN_USER.toLowerCase(), hash: bcrypt.hashSync(ADMIN_PASS, 10), role: 'admin' } },
     { upsert: true }
   );
 
   app.listen(process.env.PORT || 3000, () => {
     console.log('Sayt ishga tushdi');
     if (TELEGRAM_BOT_TOKEN) {
-      if (!ADMIN_TELEGRAM_ID) {
-        console.warn('ADMIN_TELEGRAM_ID kiritilmagan: admin xabarlari va anonim murojaatlar ishlamaydi.');
-      }
+      if (!ADMIN_TELEGRAM_ID) console.warn('ADMIN_TELEGRAM_ID kiritilmagan: admin xabarlari va anonim murojaatlar ishlamaydi.');
       pollTelegram();
     } else {
       console.warn('TELEGRAM_BOT_TOKEN kiritilmagan: Telegram tasdiqlash o‘chiq.');
     }
   });
-})().catch(e => {
-  console.error('Bazaga ulanib bo\'lmadi:', e.message);
-  process.exit(1);
-});
+})();

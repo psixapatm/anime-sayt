@@ -1,8 +1,6 @@
 
 
 
-
-
 <!DOCTYPE html>
 <html lang="uz">
 <head>
@@ -309,6 +307,8 @@ main{padding:clamp(22px,4vw,42px) clamp(16px,5vw,76px) 76px;max-width:1440px}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 /* ===== END VISUAL REFRESH ===== */
 
+
+.learning-stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}.learning-stat-grid>div{padding:16px;border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;gap:5px}.learning-stat-grid strong{font-size:25px}.learning-stat-grid small,.community-post small{color:var(--muted)}.community-feed{display:grid;gap:12px;margin-top:20px}.community-post{border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:12px}.community-post-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.community-post p{white-space:pre-wrap;overflow-wrap:anywhere}.leaderboard-row{display:flex;justify-content:space-between;align-items:center}.roadmap-lesson{padding:7px 10px;border-top:1px solid var(--line);font-size:14px}.code-editor{width:100%;min-height:130px;font:13px/1.5 ui-monospace,monospace;margin:8px 0 16px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text)}.code-preview{width:100%;height:280px;border:1px solid var(--line);border-radius:12px;background:#fff;margin-top:12px}@media(max-width:600px){.learning-stat-grid{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -399,6 +399,10 @@ function setNav() {
     nav.append(
       el('button', { className: 'icon-btn', title: 'Sevimlilar', 'aria-label': 'Sevimlilar', innerHTML: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 8.8c0 5.2-8.8 10.2-8.8 10.2S3.2 14 3.2 8.8A4.8 4.8 0 0 1 12 6.2a4.8 4.8 0 0 1 8.8 2.6Z"/></svg>', onclick: () => { filt.fav = true; showList(); } }),
       bell,
+      el('button', { title: 'Hamjamiyat', textContent: 'Hamjamiyat', onclick: () => showCommunity() }),
+      el('button', { title: 'Reyting', textContent: 'Reyting', onclick: () => showLeaderboard() }),
+      el('button', { title: 'Yo‘l xaritasi', textContent: 'Yo‘l xaritasi', onclick: () => showRoadmap() }),
+      el('button', { title: 'Kod muhiti', textContent: 'Kod yozish', onclick: () => showPlayground() }),
       el('button', { className: 'icon-btn', title: 'Profilim', 'aria-label': 'Profilim', innerHTML: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.5 3.1-5.3 7-5.3s6.3 1.8 7 5.3"/></svg>', onclick: () => showProfile() }),
       el('button', { className: me.pro ? 'pri pro-pill' : 'pro-pill', innerHTML: me.pro ? iconLabel('crown','PRO') : iconLabel('gem','Pro'), onclick: () => showPlans() })
     );
@@ -498,6 +502,7 @@ async function showProfile() {
   const proUntil=me.pro&&me.proUntil?new Date(me.proUntil).toLocaleDateString():'Faol emas';
   const avatarBadge=badgeItems.find(x=>x[0]===(me.badge||'none'))||badgeItems[0];
   const head=el('section',{className:'profile-card profile-head'},el('div',{className:'profile-symbol',innerHTML:avatarBadge[0]==='none'?'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.5 3.1-5.3 7-5.3s6.3 1.8 7 5.3"/></svg>':avatarBadge[1]}),el('div',{},el('h2',{textContent:me.profileName||me.username}),el('p',{className:'sub',textContent:'@'+me.username}),el('span',{className:me.pro?'profile-pro':'profile-free',textContent:me.pro?'PRO OBUNA':'ODDIY FOYDALANUVCHI'})));
+  const xpCard=el('section',{className:'profile-card learning-stats'},el('h3',{textContent:'O‘quv natijalaringiz'}),el('div',{className:'learning-stat-grid'},el('div',{},el('strong',{textContent:String(me.xp||0)}),el('small',{textContent:'XP ball'})),el('div',{},el('strong',{textContent:String((me.watchedEpisodes||[]).length)}),el('small',{textContent:'Ko‘rilgan dars'})),el('div',{},el('strong',{textContent:String((me.testResults||[]).length)}),el('small',{textContent:'Test urinishlari'}))),el('button',{className:'pri',textContent:'Reytingni ko‘rish',onclick:showLeaderboard}));
   const history=(me.recent||[]).map(x=>x.id);let courses=[];try{courses=await api('/api/anime')}catch{}const recent=history.map(id=>courses.find(c=>c.id===id)).filter(Boolean);
   recentBox.append(...(recent.length?recent.map(c=>el('div',{className:'profile-course',textContent:c.title,onclick:()=>showDetail(c.id)})):[el('p',{className:'sub',textContent:'Hozircha ko‘rilgan kurslar yo‘q.'})]));
   const testsBox=el('div',{className:'profile-grid'});let testRows=[];try{testRows=await api('/api/tests')}catch{}
@@ -511,7 +516,7 @@ async function showProfile() {
   const themeSelect=el('select',{value:prefs.theme||'light'},el('option',{value:'light',textContent:'Kunduzgi rejim'}),el('option',{value:'dark',textContent:'Tungi rejim'}));
   const savePrefsBtn=el('button',{className:'pri',textContent:'Sozlamalarni saqlash',onclick:()=>{savePrefs({color:colorSelect.value,font:fontSelect.value,fontSize:Number(sizeSelect.value),theme:themeSelect.value});alert('Ko‘rinish sozlamalari saqlandi.');}});
   const prefSection=el('section',{className:'profile-card'},el('h3',{innerHTML:iconLabel('palette','Shaxsiy dizayn sozlamalari')}),el('p',{className:'sub',textContent:'Rang, shrift va o‘lcham faqat sizning profilingizda saqlanadi.'}),el('label',{textContent:'Asosiy rang'}),colorSelect,el('label',{textContent:'Shrift turi'}),fontSelect,el('label',{textContent:'Shrift o‘lchami'}),sizeSelect,el('label',{textContent:'Rejim'}),themeSelect,savePrefsBtn);
-  $('#app').replaceChildren(head,
+  $('#app').replaceChildren(head,xpCard,
     el('section',{className:'profile-card'},el('h3',{textContent:'Obuna holati'}),el('p',{textContent:me.pro?'Pro obunangiz '+proUntil+' gacha faol.':'Sizda hozircha Pro obuna yo‘q.'}),el('button',{className:'pri',textContent:'Obunani boshqarish',onclick:()=>showPlans()})),
     el('section',{className:'profile-card'},el('h3',{textContent:'Profil imkoniyatlari'}),el('label',{textContent:'Sertifikatda ko‘rinadigan ism-familiya'}),name,me.profileNameEditUsed?el('p',{className:'sub',textContent:'Bir martalik tahrirlash imkoniyati ishlatilgan.'}):el('p',{className:'sub',textContent:me.profileName?'Sertifikat olish oynasida ismni bir marta tahrirlashingiz mumkin.':'Ism-familiyangizni bir marta saqlang.'}),el('label',{textContent:'Profil belgisi'+(me.pro?'':' (Pro obuna uchun)')}),badge,save,status),
     el('section',{className:'profile-card'},el('h3',{textContent:'Akaunt xavfsizligi'}),accountOpen),prefSection,
@@ -519,6 +524,31 @@ async function showProfile() {
     el('section',{className:'profile-card'},el('h3',{textContent:'Sertifikat olish uchun test'}),testsBox),
     el('section',{className:'profile-card'},el('h3',{textContent:'Mening sertifikatlarim'}),certBox));
 }
+async function showLeaderboard(){
+  try{const rows=await api('/api/leaderboard');const box=el('section',{className:'profile-card'});box.append(el('h2',{textContent:'O‘quvchilar reytingi'}),el('p',{className:'sub',textContent:'Darslarni ko‘rish va testlardan muvaffaqiyatli o‘tish orqali XP yig‘ing.'}));
+  rows.forEach(r=>box.append(el('div',{className:'community-post leaderboard-row'},el('b',{textContent:'#'+r.rank+'  '+r.name}),el('span',{textContent:r.xp+' XP'}))));$('#app').replaceChildren(box);}catch(e){alert(e.message);}
+}
+async function showCommunity(){
+  const box=el('section',{className:'profile-card'});const input=el('textarea',{placeholder:'Savolingiz yoki fikringizni yozing...',maxLength:1200});const status=el('p',{className:'sub'});const feed=el('div',{className:'community-feed'});
+  const refresh=async()=>{try{const rows=await api('/api/community');feed.replaceChildren(...(rows.length?rows.map(p=>el('article',{className:'community-post'},el('div',{className:'community-post-head'},el('b',{textContent:p.name||p.username}),el('small',{textContent:new Date(p.created).toLocaleString()})),el('p',{textContent:p.text}),((p.userId===me.id||me.owner||me.role==='admin')?el('button',{textContent:'O‘chirish',onclick:async()=>{await api('/api/community/'+p.id,'DELETE');refresh();}}):el('span')))):[el('p',{className:'sub',textContent:'Hozircha xabarlar yo‘q. Birinchi bo‘lib yozing!'})]));}catch(e){status.textContent=e.message;}};
+  const send=el('button',{className:'pri',textContent:'Xabar yuborish',onclick:async()=>{try{await api('/api/community','POST',{text:input.value});input.value='';status.textContent='Xabaringiz joylandi.';refresh();}catch(e){status.textContent=e.message;}}});box.append(el('h2',{textContent:'O‘quvchilar hamjamiyati'}),el('p',{className:'sub',textContent:'Savol bering, tajriba almashing va boshqalarga yordam bering.'}),input,send,status,feed);$('#app').replaceChildren(box);refresh();
+}
+async function showRoadmap(){
+  try{const rows=await api('/api/roadmap');const box=el('section',{className:'profile-card'});box.append(el('h2',{textContent:'O‘quv yo‘l xaritasi'}),el('p',{className:'sub',textContent:'Kurslarni ketma-ket o‘rganing. Ko‘rilgan darslar bajarilgan deb belgilanadi.'}));
+  rows.forEach(c=>{const done=c.lessons.filter(x=>x.done).length;const card=el('article',{className:'community-post'},el('h3',{textContent:c.order+'. '+c.title}),el('p',{className:'sub',textContent:c.genre+' · '+done+'/'+c.lessons.length+' dars bajarilgan'}));c.lessons.forEach((l,i)=>card.append(el('div',{className:'roadmap-lesson',textContent:(l.done?'✓ ':'○ ')+(i+1)+'. '+l.title})));card.append(el('button',{className:'pri',textContent:'Kursni ochish',onclick:()=>showDetail(c.id)}));box.append(card);});if(!rows.length)box.append(el('p',{className:'sub',textContent:'Hozircha yo‘l xaritasiga kurslar qo‘shilmagan.'}));$('#app').replaceChildren(box);}catch(e){alert(e.message);}
+}
+function showPlayground(){
+  const box=el('section',{className:'profile-card'});
+  const html=el('textarea',{className:'code-editor',spellcheck:false,value:'<!doctype html>\n<html>\n<body>\n  <h1>Salom, dunyo!</h1>\n  <p>Men kod yozishni o‘rganyapman.</p>\n</body>\n</html>'});
+  const css=el('textarea',{className:'code-editor',spellcheck:false,value:'body { font-family: Arial; padding: 24px; } h1 { color: royalblue; }'});
+  const js=el('textarea',{className:'code-editor',spellcheck:false,value:"console.log('Salom!');"});
+  const frame=el('iframe',{className:'code-preview'});frame.setAttribute('sandbox','allow-scripts');
+  const run=()=>{const scriptTag='<scr'+'ipt>'+js.value+'</scr'+'ipt>';const source=html.value.replace('</head>','<style>'+css.value+'</style></head>').replace('</body>',scriptTag+'</body>');frame.srcdoc=source;};
+  const btn=el('button',{className:'pri',textContent:'▶ Ishga tushirish',onclick:run});
+  box.append(el('h2',{textContent:'Onlayn kod muhiti'}),el('p',{className:'sub',textContent:'HTML, CSS va JavaScript kodlarini yozing va natijani shu yerda ko‘ring. Kodlar serverga yuborilmaydi.'}),el('label',{textContent:'HTML'}),html,el('label',{textContent:'CSS'}),css,el('label',{textContent:'JavaScript'}),js,btn,el('h3',{textContent:'Natija'}),frame);
+  $('#app').replaceChildren(box);run();
+}
+
 function openAccountChange(){
   const overlay=el('div',{className:'overlay account-overlay'});const panel=el('div',{className:'account-modal'});const close=el('button',{className:'x',textContent:'×',onclick:()=>overlay.remove()});
   const login=el('input',{placeholder:'Yangi login (ixtiyoriy)',maxLength:20,autocomplete:'username'});const pass=el('input',{type:'password',placeholder:'Yangi parol (ixtiyoriy)',autocomplete:'new-password'});const status=el('p',{className:'sub'});

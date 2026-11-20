@@ -196,6 +196,8 @@ input,textarea,select{border-radius:12px}
 .head-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}#themeToggle{white-space:nowrap}
 @media(max-width:640px){header{padding:10px 4vw}nav{width:100%;gap:6px}nav button,#themeToggle{font-size:13px;padding:8px 11px;min-height:38px}main{padding:22px 4vw 56px}}
 
+
+.icon-btn{width:42px;min-width:42px;padding:6px;border-radius:14px;font-size:23px;line-height:1;background:var(--card);display:inline-flex;align-items:center;justify-content:center}.pro-pill{border-radius:999px}.profile-card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;margin:14px 0;box-shadow:var(--shadow)}.profile-symbol{width:76px;height:76px;border-radius:24px;background:linear-gradient(135deg,#6655df,#19a5a5);display:grid;place-items:center;font-size:36px;color:white}.profile-card:first-child{display:flex;align-items:center;gap:18px}.profile-pro{color:#a9790c;font-weight:900}.profile-free{color:var(--mut);font-weight:800}.profile-card input,.profile-card select,.profile-card textarea{width:100%;padding:12px;margin:7px 0 12px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}.profile-grid{display:grid;gap:9px}.profile-course,.test-option{padding:10px;border:1px solid var(--line);border-radius:12px;margin:5px 0}.profile-course{cursor:pointer}.test-option{display:flex;align-items:center;gap:8px}.test-option input{width:auto;margin:0}@media(max-width:640px){.profile-card{padding:15px}.icon-btn{width:38px;min-width:38px}}
 </style>
 </head>
 <body>
@@ -253,17 +255,17 @@ function setNav() {
     const isAdmin = me.role === 'admin' || me.owner === true;
     const isMain = me.owner === true || me.adminLevel === 'main';
     const roleLabel = me.owner ? ' (Bosh Admin)' : me.role === 'admin' ? (me.adminLevel === 'main' ? ' (Main Admin)' : ' (Oddiy Admin)') : '';
-    const bell = el('button', { textContent: 'Bildirishnoma', onclick: () => showNotifs() });
+    const bell = el('button', { className: 'icon-btn', title: 'Bildirishnomalar', 'aria-label': 'Bildirishnomalar', innerHTML: '🔔', onclick: () => showNotifs() });
     nav.append(
-      el('span', { textContent: me.username + roleLabel }),
-      el('button', { className: me.pro ? 'pri' : '', textContent: me.pro ? 'Pro' : 'Obuna', onclick: () => showPlans() }),
-      el('button', { textContent: 'Sevimlilar', onclick: () => { filt.fav = true; showList(); } }),
-      bell
+      el('button', { className: 'icon-btn', title: 'Sevimlilar', 'aria-label': 'Sevimlilar', innerHTML: '♡', onclick: () => { filt.fav = true; showList(); } }),
+      bell,
+      el('button', { className: 'icon-btn', title: 'Profilim', 'aria-label': 'Profilim', innerHTML: '♙', onclick: () => showProfile() }),
+      el('button', { className: me.pro ? 'pri pro-pill' : 'pro-pill', textContent: me.pro ? '♛ PRO' : '💎 Pro', onclick: () => showPlans() })
     );
     if (isAdmin && isMain) nav.append(el('button', { textContent: "Kurs qo'shish", onclick: () => showAdd() }));
     if (isAdmin) nav.append(el('button', { className: 'pri', textContent: 'Admin panel', onclick: () => showAdminPanel('stats') }));
     nav.append(el('button', { textContent: 'Chiqish', onclick: logout }));
-    api('/api/notifications').then(d => { if (d.unread) bell.textContent = 'Bildirishnoma (' + d.unread + ')'; }).catch(() => {});
+    api('/api/notifications').then(d => { if (d.unread) { bell.textContent = '🔔'; bell.dataset.count = d.unread; bell.title = d.unread + ' ta yangi bildirishnoma'; } }).catch(() => {});
   } else {
     nav.append(
       el('button', { textContent: 'Kirish', onclick: () => showAuth('login') }),
@@ -371,6 +373,49 @@ function showAuth(mode) {
   u.focus();
 }
 
+async function showProfile() {
+  try { me = await api('/api/me'); } catch { return logout(); }
+  const recentBox = el('div', { className: 'profile-grid' });
+  const name = el('input', { value: me.profileName || '', placeholder: 'Ism va familiyangiz (sertifikat uchun)', maxLength: 80 });
+  const badge = el('select', {});
+  [['none','Bezaksiz'],['crown','👑 Toj'],['star','⭐ Yulduz'],['fire','🔥 Olov'],['diamond','💎 Olmos'],['code','</> Kod']].forEach(([v,t]) => badge.append(el('option',{value:v,textContent:t})));
+  badge.value = me.badge || 'none';
+  const status = el('div',{className:'sub'});
+  const save = el('button',{className:'pri',textContent:'Profilni saqlash',onclick:async()=>{try{await api('/api/profile','PUT',{profileName:name.value,badge:badge.value});me=await api('/api/me');status.textContent='Profil saqlandi.';setNav();}catch(e){status.textContent=e.message;}}});
+  const proUntil = me.pro && me.proUntil ? new Date(me.proUntil).toLocaleDateString() : 'Faol emas';
+  const head = el('section',{className:'profile-card'},el('div',{className:'profile-symbol',textContent:me.badge==='crown'?'👑':me.badge==='star'?'⭐':me.badge==='fire'?'🔥':me.badge==='diamond'?'💎':me.badge==='code'?'</>':'♙'}),el('div',{},el('h2',{textContent:me.profileName||me.username}),el('p',{className:'sub',textContent:'@'+me.username}),el('span',{className:me.pro?'profile-pro':'profile-free',textContent:me.pro?'PRO OBUNA':'ODDIY FOYDALANUVCHI'})));
+  const history = (me.recent||[]).map(x=>x.id);
+  let courses=[];try{courses=await api('/api/anime');}catch{}
+  const recent = history.map(id=>courses.find(c=>c.id===id)).filter(Boolean);
+  recentBox.append(...(recent.length?recent.map(c=>el('div',{className:'profile-course',textContent:c.title,onclick:()=>showDetail(c.id)})):[el('p',{className:'sub',textContent:'Hozircha ko‘rilgan kurslar yo‘q.'})]));
+  const testsBox=el('div',{className:'profile-grid'});
+  let testRows=[];try{testRows=await api('/api/tests');}catch{}
+  testsBox.append(...(testRows.length?testRows.map(t=>el('button',{textContent:'📝 '+t.title+' — '+t.courseTitle,onclick:()=>takeTest(t.id)})):[el('p',{className:'sub',textContent:'Hozircha sertifikat testlari mavjud emas.'})]));
+  const certBox=el('div',{className:'profile-grid'});
+  (me.certificates||[]).forEach(c=>certBox.append(el('button',{textContent:'🏅 '+c.courseTitle+' · '+c.fullName,onclick:()=>printCertificate(c)})));
+  $('#app').replaceChildren(head,
+    el('section',{className:'profile-card'},el('h3',{textContent:'Obuna holati'}),el('p',{textContent:me.pro?'Pro obunangiz '+proUntil+' gacha faol.':'Sizda hozircha Pro obuna yo‘q.'}),el('button',{className:'pri',textContent:'Obunani boshqarish',onclick:()=>showPlans()})),
+    el('section',{className:'profile-card'},el('h3',{textContent:'Profil imkoniyatlari'}),el('label',{textContent:'Sertifikatda ko‘rinadigan ism-familiya'}),name,el('label',{textContent:'Profil belgisi (faqat Pro)'}),badge,save,status),
+    el('section',{className:'profile-card'},el('h3',{textContent:'Oxirgi ko‘rilgan 5 ta kurs'}),recentBox),
+    el('section',{className:'profile-card'},el('h3',{textContent:'Sertifikat olish uchun test'}),testsBox),
+    el('section',{className:'profile-card'},el('h3',{textContent:'Mening sertifikatlarim'}),certBox));
+}
+async function takeTest(id){
+  try{
+    const t=await api('/api/tests/'+id);const answers={};const nodes=[el('h2',{textContent:t.title}),el('p',{className:'sub',textContent:'Kurs: '+t.courseTitle})];
+    t.questions.forEach((q,i)=>{const group=el('div',{className:'profile-card'},el('b',{textContent:(i+1)+'. '+q.text}));q.options.forEach((o,j)=>{const lab=el('label',{className:'test-option'});const radio=el('input',{type:'radio',name:q.id,value:String(j)});radio.onchange=()=>answers[q.id]=j;lab.append(radio,document.createTextNode(' '+o));group.append(lab);});nodes.push(group);});
+    nodes.push(el('button',{className:'pri',textContent:'Testni yakunlash',onclick:async()=>{try{const r=await api('/api/tests/'+id+'/submit','POST',{answers});const out=el('div',{className:'profile-card'},el('h3',{textContent:`Natija: ${r.correct}/${r.total} — ${r.percent}%`}),el('p',{textContent:r.passed?'Tabriklaymiz! Testdan muvaffaqiyatli o‘tdingiz.':'Afsus, kerakli natijaga yetmadingiz.'}));if(r.passed){const fn=el('input',{placeholder:'Sertifikat uchun ism-familiyangiz'});out.append(fn,el('button',{className:'pri',textContent:'Sertifikat yaratish',onclick:async()=>{try{const cert=await api('/api/certificates','POST',{fullName:fn.value,testId:id,percent:r.percent});printCertificate(cert);showProfile();}catch(e){alert(e.message);}}}));}$('#app').replaceChildren(out);}catch(e){alert(e.message);}}}));
+    $('#app').replaceChildren(...nodes);
+  }catch(e){alert(e.message);}
+}
+function printCertificate(c){
+  const w=window.open('','_blank');if(!w){alert('Sertifikatni ko‘rish uchun oynani ochishga ruxsat bering.');return;}
+  const safe=x=>String(x||'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Sertifikat</title><style>@page{size:A4 landscape;margin:0}*{box-sizing:border-box}body{margin:0;background:#eef1f8;font-family:Georgia,serif}.cert{width:297mm;height:210mm;margin:auto;padding:17mm;background:linear-gradient(135deg,#101d3c,#172d58);color:#fff}.frame{height:100%;border:3px solid #d8b765;outline:1px solid #d8b765;outline-offset:-9px;text-align:center;padding:22mm 18mm;position:relative}.small{letter-spacing:5px;color:#e5c979;font: bold 13px Arial}.title{font-size:42px;letter-spacing:5px;color:#f0d58a;margin:12px}.name{font-size:34px;border-bottom:1px solid #d8b765;display:inline-block;padding:8px 45px;margin:12px}.course{font-size:23px;color:#d7e5ff;margin:15px}.foot{display:flex;justify-content:space-between;margin-top:23px;font:14px Arial}.seal{color:#e5c979;font-size:12px}@media print{body{background:white}}
+.icon-btn{width:42px;min-width:42px;padding:6px;border-radius:14px;font-size:23px;line-height:1;background:var(--card);display:inline-flex;align-items:center;justify-content:center}.pro-pill{border-radius:999px}.profile-card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;margin:14px 0;box-shadow:var(--shadow)}.profile-symbol{width:76px;height:76px;border-radius:24px;background:linear-gradient(135deg,#6655df,#19a5a5);display:grid;place-items:center;font-size:36px;color:white}.profile-card:first-child{display:flex;align-items:center;gap:18px}.profile-pro{color:#a9790c;font-weight:900}.profile-free{color:var(--mut);font-weight:800}.profile-card input,.profile-card select,.profile-card textarea{width:100%;padding:12px;margin:7px 0 12px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}.profile-grid{display:grid;gap:9px}.profile-course,.test-option{padding:10px;border:1px solid var(--line);border-radius:12px;margin:5px 0}.profile-course{cursor:pointer}.test-option{display:flex;align-items:center;gap:8px}.test-option input{width:auto;margin:0}@media(max-width:640px){.profile-card{padding:15px}.icon-btn{width:38px;min-width:38px}}
+</style></head><body><div class="cert"><div class="frame"><div class="small">DASTURLASH KURSI · TA’LIM SERTIFIKATI</div><div class="title">SERTIFIKAT</div><p>Ushbu sertifikat quyidagi ishtirokchiga beriladi</p><div class="name">${safe(c.fullName)}</div><p>“${safe(c.courseTitle)}” kursini muvaffaqiyatli yakunlagani uchun</p><div class="course">Test natijasi: ${safe(c.percent)}%</div><div class="foot"><div>Berilgan sana: ${new Date(c.created).toLocaleDateString()}<br>Sertifikat № ${safe(c.id)}</div><div class="seal">SAYT RAHBARI<br><b>Sobirov Muhammadumar</b></div></div></div></div><script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close();
+}
+
 async function showNotifs() {
   const box = el('div', { style: 'max-width:640px' });
   const head = [el('h2', { textContent: 'Bildirishnomalar', style: 'margin-bottom:12px' })];
@@ -427,7 +472,7 @@ async function showAdminPanel(tab = 'stats') {
     alert("Sizda admin panelga kirish huquqi yo'q.");
     return;
   }
-  const allTabs = [['stats', 'Statistika'], ['users', 'Foydalanuvchilar'], ['comments', 'Izohlar'], ['genres', "Yo'nalishlar"], ['plans', 'Tariflar'], ['promos', 'Promo kodlar'], ['new', 'Yangi admin']];
+  const allTabs = [['stats', 'Statistika'], ['users', 'Foydalanuvchilar'], ['comments', 'Izohlar'], ['genres', "Yo'nalishlar"], ['plans', 'Tariflar'], ['promos', 'Promo kodlar'], ['tests', 'Testlar'], ['new', 'Yangi admin']];
   const isOwner = me.owner === true;
   const isMain = isOwner || me.adminLevel === 'main';
   const tabs = isOwner ? allTabs : isMain ? allTabs.filter(([k]) => k !== 'new') : allTabs.filter(([k]) => k === 'stats');
@@ -503,6 +548,13 @@ async function showAdminPanel(tab = 'stats') {
           el('button', { className: 'pri', textContent: 'Yaratish', onclick: run(async () => { await api('/api/admin/promos', 'POST', { code: code.value, days: days.value, maxUses: max.value }); showAdminPanel('promos'); }) })),
         ...ps.map(p => el('div', { className: 'cm urow' }, el('div', {}, el('b', { textContent: p.code }), el('small', { textContent: ' | ' + p.days + ' kun | ' + p.used + '/' + p.maxUses })),
           el('button', { className: 'del', textContent: "O'chirish", onclick: run(async () => { await api('/api/admin/promos/' + p.id, 'DELETE'); showAdminPanel('promos'); }) }))));
+    } else if (tab === 'tests') {
+      const courses = await api('/api/anime'); const rows = await api('/api/admin/tests');
+      const title = el('input', { placeholder: 'Test nomi' }); const course = el('select', {}); courses.forEach(c => course.append(el('option', { value: c.id, textContent: c.title })));
+      const pct = el('input', { type: 'number', value: 70, min: 50, max: 100, placeholder: 'O‘tish foizi' });
+      const qtext = el('textarea', { rows: 2, placeholder: 'Savol matni' }); const opts = el('textarea', { rows: 4, placeholder: 'Javob variantlari — har qatorda bittadan' }); const correct = el('input', { type: 'number', value: 1, min: 1, placeholder: 'To‘g‘ri javob raqami (1 dan boshlanadi)' });
+      body.append(el('h3', { textContent: 'Yangi test yaratish' }), title, course, pct, qtext, opts, correct, el('button', { className: 'pri', textContent: 'Test yaratish (bitta savol bilan)', onclick: async () => { try { const options = opts.value.split('\n').map(x => x.trim()).filter(Boolean); await api('/api/admin/tests', 'POST', { title: title.value, courseId: course.value, passPercent: pct.value, questions: [{ text: qtext.value, options, correct: Number(correct.value)-1 }] }); showAdminPanel('tests'); } catch(e) { alert(e.message); } } }), el('h3', { textContent: 'Mavjud testlar' }));
+      rows.forEach(t => body.append(el('div', { className: 'cm urow' }, el('div', {}, el('b', { textContent: t.title+' — '+t.courseTitle }), el('small', { textContent: (t.questions||[]).length+' savol · '+t.passPercent+'% o‘tish' })), el('button', { textContent: 'Tahrirlash', onclick: async () => { const newTitle=prompt('Test nomi',t.title); if(newTitle===null)return; const raw=prompt('Savollar JSON: [{\"text\":\"Savol\",\"options\":[\"A\",\"B\"],\"correct\":0}]',JSON.stringify(t.questions||[])); if(raw===null)return; try { await api('/api/admin/tests/'+t.id,'PUT',{title:newTitle,questions:JSON.parse(raw),passPercent:Number(prompt('O‘tish foizi',String(t.passPercent||70))),active:t.active}); showAdminPanel('tests'); } catch(e) { alert(e.message); } } }), el('button', { textContent: t.active?'Faolsizlantirish':'Faollashtirish', onclick: async()=>{await api('/api/admin/tests/'+t.id,'PUT',{active:!t.active,passPercent:t.passPercent});showAdminPanel('tests');} }), el('button', { className:'del', textContent:'O‘chirish', onclick:async()=>{if(confirm('Test o‘chirilsinmi?')){await api('/api/admin/tests/'+t.id,'DELETE');showAdminPanel('tests');}} }))));
     } else {
       const err = el('div', { className: 'err' });
       const form = el('div', { className: 'form' }, el('h3', { textContent: 'Yangi admin akaunt' }),

@@ -1,8 +1,6 @@
 
 
 
-
-
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -19,7 +17,7 @@ const SECRET = process.env.JWT_SECRET ||
   crypto.createHash('sha256').update(MONGODB_URI + ADMIN_PASS).digest('hex');
 
 const app = express();
-let users, animes, comments, genres, reactions, notifs, promos, tariffs, pendingRegs, tests;
+let users, animes, comments, genres, reactions, notifs, promos, tariffs, pendingRegs, tests, community;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_BOT_USERNAME = 'verification_zverbot';
 const ADMIN_TELEGRAM_ID = String(process.env.ADMIN_TELEGRAM_ID || '').trim();
@@ -100,7 +98,7 @@ app.post('/api/login', wrap(async (req, res) => {
 app.get('/api/me', auth, wrap(async (req, res) => {
   const u = await users.findOne({ id: req.user.id });
   if (!u) return res.status(401).json({ error: 'Avval tizimga kiring' });
-  res.json({ username: u.username, role: u.role, adminLevel: u.adminLevel || null, favs: u.favs || [], owner: u.lower === ADMIN_USER.toLowerCase(), proUntil: u.proUntil || null, pro: (u.proUntil || 0) > Date.now(), profileName: u.profileName || '', profileNameEditUsed: !!u.profileNameEditUsed, badge: u.badge || 'none', recent: u.recent || [], certificates: u.certificates || [] });
+  res.json({ id: u.id, username: u.username, role: u.role, adminLevel: u.adminLevel || null, favs: u.favs || [], owner: u.lower === ADMIN_USER.toLowerCase(), proUntil: u.proUntil || null, pro: (u.proUntil || 0) > Date.now(), profileName: u.profileName || '', profileNameEditUsed: !!u.profileNameEditUsed, badge: u.badge || 'none', recent: u.recent || [], certificates: u.certificates || [], xp: u.xp || 0, watchedEpisodes: u.watchedEpisodes || [], testResults: u.testResults || [] });
 }));
 
 app.get('/api/anime', auth, wrap(async (req, res) => {
@@ -209,7 +207,11 @@ app.put('/api/anime/:id/episodes/:eid', auth, mainAdminOnly, wrap(async (req, re
 }));
 app.post('/api/anime/:id/episodes/:eid/view', auth, wrap(async (req, res) => {
   await animes.updateOne({ id: req.params.id, 'episodes.id': req.params.eid }, { $inc: { 'episodes.$.views': 1 } });
-  res.json({ ok: true });
+  const key = req.params.id + ':' + req.params.eid;
+  const u = await users.findOne({ id: req.user.id });
+  const firstView = !(u.watchedEpisodes || []).includes(key);
+  if (firstView) await users.updateOne({ id: req.user.id }, { $addToSet: { watchedEpisodes: key }, $inc: { xp: 5 } });
+  res.json({ ok: true, xpEarned: firstView ? 5 : 0 });
 }));
 app.delete('/api/anime/:id/episodes/:eid', auth, mainAdminOnly, wrap(async (req, res) => {
   await animes.updateOne({ id: req.params.id }, { $pull: { episodes: { id: req.params.eid } } });
@@ -327,8 +329,12 @@ app.post('/api/tests/:id/submit', auth, wrap(async (req, res) => {
   const total = (t.questions || []).length;
   if (!total) return res.status(400).json({ error: 'Test savollari mavjud emas.' });
   const percent = Math.round(correct / total * 100), passed = percent >= (t.passPercent || 70);
-  await users.updateOne({ id: req.user.id }, { $push: { testResults: { $each: [{ testId: t.id, percent, passed, at: Date.now() }], $slice: -50 } } });
-  res.json({ correct, total, percent, passed, testId: t.id, courseId: t.courseId, courseTitle: t.courseTitle, required: t.passPercent || 70 });
+  const learner = await users.findOne({ id: req.user.id });
+  const firstPass = passed && !(learner.xpAwards || []).includes('test:' + t.id);
+  const update = { $push: { testResults: { $each: [{ testId: t.id, percent, passed, at: Date.now() }], $slice: -50 } } };
+  if (firstPass) { update.$inc = { xp: 30 }; update.$addToSet = { xpAwards: 'test:' + t.id }; }
+  await users.updateOne({ id: req.user.id }, update);
+  res.json({ correct, total, percent, passed, xpEarned: firstPass ? 30 : 0, testId: t.id, courseId: t.courseId, courseTitle: t.courseTitle, required: t.passPercent || 70 });
 }));
 app.get('/api/admin/tests', auth, mainAdminOnly, wrap(async (req, res) => {
   res.json(await tests.find({}, { projection: { _id: 0 } }).sort({ created: -1 }).toArray());
@@ -502,6 +508,34 @@ app.get('/api/notifications', auth, wrap(async (req, res) => {
 app.post('/api/notifications/seen', auth, wrap(async (req, res) => {
   await users.updateOne({ id: req.user.id }, { $set: { notifSeen: Date.now() } });
   res.json({ ok: true });
+}));
+
+// O'quvchilar reytingi, hamjamiyat va o'quv yo'l xaritasi
+app.get('/api/leaderboard', auth, wrap(async (req, res) => {
+  const rows = await users.find({}, { projection: { _id: 0, username: 1, profileName: 1, xp: 1, badge: 1 } }).sort({ xp: -1, username: 1 }).limit(50).toArray();
+  res.json(rows.map((u, i) => ({ rank: i + 1, username: u.username, name: u.profileName || u.username, xp: u.xp || 0, badge: u.badge || 'none' })));
+}));
+app.get('/api/community', auth, wrap(async (req, res) => {
+  const rows = await community.find({}, { projection: { _id: 0 } }).sort({ created: -1 }).limit(60).toArray();
+  res.json(rows);
+}));
+app.post('/api/community', auth, wrap(async (req, res) => {
+  const body = String(req.body.text || '').trim().slice(0, 1200);
+  if (body.length < 3) return res.status(400).json({ error: 'Xabar kamida 3 ta belgidan iborat bo‘lsin.' });
+  const post = { id: crypto.randomUUID(), userId: req.user.id, username: req.user.username, name: String((await users.findOne({ id: req.user.id }))?.profileName || req.user.username), text: body, created: Date.now() };
+  await community.insertOne(post);
+  res.json({ ok: true, post: { ...post, _id: undefined } });
+}));
+app.delete('/api/community/:id', auth, wrap(async (req, res) => {
+  const p = await community.findOne({ id: req.params.id });
+  if (!p) return res.json({ ok: true });
+  if (p.userId !== req.user.id && !req.user.owner && req.user.role !== 'admin') return res.status(403).json({ error: 'Bu xabarni o‘chirishga ruxsat yo‘q.' });
+  await community.deleteOne({ id: p.id }); res.json({ ok: true });
+}));
+app.get('/api/roadmap', auth, wrap(async (req, res) => {
+  const courses = await animes.find({}, { projection: { _id: 0, id: 1, title: 1, genre: 1, description: 1, episodes: 1 } }).sort({ created: 1 }).toArray();
+  const u = await users.findOne({ id: req.user.id }); const done = new Set(u.watchedEpisodes || []);
+  res.json(courses.map((c, i) => ({ id: c.id, title: c.title, genre: c.genre || '', description: c.description || '', order: i + 1, lessons: (c.episodes || []).map(e => ({ id: e.id, title: e.title, done: done.has(c.id + ':' + e.id) })) })));
 }));
 
 // Pro obuna (faqat bosh admin beradi) va promo kodlar
@@ -834,6 +868,9 @@ async function pollTelegram() {
   tariffs = db.collection('tariffs');
   pendingRegs = db.collection('pendingRegs');
   tests = db.collection('tests');
+  community = db.collection('community');
+  await community.createIndex({ created: -1 });
+  await community.createIndex({ id: 1 }, { unique: true });
   botReplies = db.collection('botReplies');
   payments = db.collection('payments');
   botSettings = db.collection('botSettings');
@@ -872,9 +909,7 @@ async function pollTelegram() {
   );
   app.listen(process.env.PORT || 3000, () => { console.log('Sayt ishga tushdi'); if (TELEGRAM_BOT_TOKEN) { if (!ADMIN_TELEGRAM_ID) console.warn('ADMIN_TELEGRAM_ID kiritilmagan: admin xabarlari va anonim murojaatlar ishlamaydi.'); pollTelegram(); } else console.warn('TELEGRAM_BOT_TOKEN kiritilmagan: Telegram tasdiqlash o‘chiq.'); });
 })().catch(e => { console.error('Bazaga ulanib bo\'lmadi:', e.message); process.exit(1); });
-Контекстное окно заполнено
-Начните новый чат с автоматически созданной сводкой этого разговора или перейдите на платный план, чтобы продолжить здесь и увеличить объём доступного контекста в каждом чате.
 
 
-xa men ikalasini ham joylaganman
+
 

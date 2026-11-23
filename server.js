@@ -14,11 +14,6 @@
 
 
 
-
-
-
-
-
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -1022,6 +1017,10 @@ async function pollTelegram() {
   );
   app.listen(process.env.PORT || 3000, () => { console.log('Sayt ishga tushdi'); if (TELEGRAM_BOT_TOKEN) { if (!ADMIN_TELEGRAM_ID) console.warn('ADMIN_TELEGRAM_ID kiritilmagan: admin xabarlari va anonim murojaatlar ishlamaydi.'); pollTelegram(); } else console.warn('TELEGRAM_BOT_TOKEN kiritilmagan: Telegram tasdiqlash o‘chiq.'); });
 })().catch(e => { console.error('Bazaga ulanib bo\'lmadi:', e.message); process.exit(1); });
+
+
+
+
 
 
 

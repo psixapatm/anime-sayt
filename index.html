@@ -12,10 +12,6 @@
 
 
 
-
-
-
-
 <!DOCTYPE html>
 <html lang="uz">
 <head>
@@ -974,15 +970,49 @@ async function takeTest(id){
 
 function printCertificate(c){
   const w=window.open('','_blank');if(!w){alert('Sertifikatni ko‘rish uchun oynani ochishga ruxsat bering.');return;}
-  const safe=x=>String(x||'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-  const date=c.created?new Date(c.created).toLocaleDateString('uz-UZ'):'—';
+  const safe=x=>String(x??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const date=c.created?new Date(c.created).toLocaleDateString('uz-UZ',{day:'2-digit',month:'2-digit',year:'numeric',timeZone:'Asia/Tashkent'}):'—';
   w.document.write(`<!doctype html><html lang="uz"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sertifikat · ${safe(c.id)}</title><style>
-  @page{size:A4 landscape;margin:0}*{box-sizing:border-box}html,body{margin:0;width:297mm;height:210mm}body{font-family:Arial,sans-serif;background:#f5f6f9;color:#18264a;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .cert{position:relative;width:297mm;height:210mm;padding:10mm;background:#fbfaf6;overflow:hidden}.frame{height:100%;position:relative;border:1.5mm solid #10266f;padding:13mm 16mm 10mm;text-align:center;outline:.5mm solid #c8a45e;outline-offset:-4mm}
-  .topline{font-size:10pt;font-weight:800;letter-spacing:4px;color:#c09b4f}.title{margin:5mm 0 3mm;font: bold 33pt Georgia,serif;letter-spacing:5px;color:#10266f}.subtitle{font-size:11pt;color:#68738a}.recipient{margin:7mm auto 3mm;font: bold 26pt Georgia,serif;color:#10266f;border-bottom:.4mm solid #c8a45e;display:inline-block;padding:0 18mm 3mm;max-width:90%}.description{margin:5mm auto 0;font:13pt Georgia,serif;color:#293550}.course{margin:3mm auto 0;font: bold 13pt Arial,sans-serif;color:#2447a5}.bottom{position:absolute;left:15mm;right:15mm;bottom:12mm;display:flex;align-items:flex-end;justify-content:space-between;text-align:left;font-size:9pt;color:#59657c}.meta{line-height:1.8}.authority{width:78mm;position:relative;min-height:37mm;text-align:center}.signature{display:block;width:48mm;height:20mm;object-fit:contain;margin:0 auto -1mm;mix-blend-mode:multiply}.authority-label{font-size:9pt;font-weight:800;letter-spacing:1px;color:#10266f;border-top:.35mm solid #c8a45e;padding-top:2mm}.stamp{position:absolute;right:-2mm;top:-7mm;width:29mm;height:29mm;border:1.2mm double #183b91;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#183b91;background:#fbfaf6e8;transform:rotate(-9deg);font-weight:900;font-size:6.5pt;letter-spacing:.5px;line-height:1.5}.stamp:before{content:"";position:absolute;inset:2mm;border:.35mm solid #c8a45e;border-radius:50%}.stamp .star{font-size:15pt;color:#c8a45e;line-height:1.1}.brand-foot{position:absolute;bottom:4mm;left:0;right:0;text-align:center;font-size:7pt;letter-spacing:2px;color:#7a8496}
-  @media print{body{background:#fbfaf6}.cert{margin:0}}
-  </style></head><body><div class="cert"><div class="frame"><div class="topline">DASTURLASH KURSI · CREATED BY SOBIROV</div><div class="title">SERTIFIKAT</div><div class="subtitle">Ushbu sertifikat quyidagi ishtirokchiga taqdim etiladi</div><div class="recipient">${safe(c.fullName)}</div><div class="description">“${safe(c.courseTitle)}” o‘quv kursini muvaffaqiyatli yakunlagani<br>va dasturlash bo‘yicha bilim hamda ko‘nikmalarni egallagani uchun</div><div class="course">TEST NATIJASI: ${safe(c.percent)}%</div>
-  <div class="bottom"><div class="meta"><b>BERILGAN SANA:</b> ${safe(date)}<br><b>SERTIFIKAT RAQAMI:</b> ${safe(c.id)}</div><div class="authority"><img class="signature" src="/certificate-signature.png" alt="Sayt rahbari imzosi"><div class="authority-label">MUALLIF: SOBIROV MUHAMMADUMAR</div><div class="stamp"><span>DASTURLASH</span><span>KURSI</span><span class="star">✦</span><span>SOBIROV</span></div></div></div><div class="brand-foot">DASTURLASH KURSI — TA’LIM VA AMALIYOT</div></div></div><script>window.onload=()=>setTimeout(()=>window.print(),350)<\/script></body></html>`);w.document.close();
+  @page{size:A4 landscape;margin:0}
+  *{box-sizing:border-box}
+  html,body{margin:0;width:297mm;height:210mm}
+  body{font-family:Arial,Helvetica,sans-serif;background:#080b12;color:#f5f7fb;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .cert{position:relative;width:297mm;height:210mm;overflow:hidden;padding:7mm;background:radial-gradient(ellipse at 50% 45%,#111a2b 0%,#090d16 52%,#05070b 100%)}
+  .cert:before{content:"";position:absolute;inset:0;background:linear-gradient(132deg,transparent 0 12%,rgba(30,111,219,.22) 12.1%,rgba(8,26,54,.55) 16%,transparent 16.2% 74%,rgba(24,95,184,.18) 74.2%,transparent 82%),linear-gradient(312deg,transparent 0 9%,rgba(120,143,173,.12) 9.2%,transparent 21%),repeating-linear-gradient(135deg,rgba(255,255,255,.018) 0 1px,transparent 1px 14px);pointer-events:none}
+  .frame{position:relative;height:100%;border:1.15mm solid #b9c6d9;padding:9mm 14mm 8mm;text-align:center;overflow:hidden;background:linear-gradient(145deg,rgba(255,255,255,.018),transparent 40%,rgba(26,86,156,.045))}
+  .frame:before{content:"";position:absolute;inset:2mm;border:.25mm solid rgba(104,159,226,.5);pointer-events:none}
+  .corner{position:absolute;width:60mm;height:60mm;pointer-events:none;opacity:.9}
+  .corner.tl{left:-20mm;top:-24mm;background:linear-gradient(135deg,#123c76,#07111f 58%,transparent 59%);transform:skewY(-28deg);border-right:.5mm solid #2589ff}
+  .corner.br{right:-20mm;bottom:-25mm;background:linear-gradient(135deg,transparent 35%,#0b1a30 36%,#174c88);transform:skewY(-28deg);border-left:.5mm solid #2589ff}
+  .brand{position:relative;margin:0 auto 2mm;font-size:11pt;font-weight:800;letter-spacing:3.6px;color:#f4f7fc}
+  .brand:before{content:"</>";display:block;font-size:23pt;font-weight:900;letter-spacing:-2px;color:#e8effa;margin-bottom:1mm;text-shadow:0 0 12px rgba(50,145,255,.35)}
+  .created{font-size:9pt;letter-spacing:4px;color:#c6d3e5;margin-bottom:2mm}
+  .title{margin:1mm 0 1mm;font:700 38pt Georgia,'Times New Roman',serif;letter-spacing:6px;color:#edf2fa;text-shadow:0 2px 0 #74849a,0 0 18px rgba(115,157,210,.18)}
+  .ribbon{display:inline-block;margin:0 auto 4mm;padding:2mm 17mm;background:linear-gradient(90deg,#8799b2,#edf2fa 48%,#8799b2);color:#111722;font:700 13pt Georgia,serif;clip-path:polygon(0 0,100% 0,96% 50%,100% 100%,0 100%,4% 50%)}
+  .recipient{margin:1mm auto 3mm;font:700 27pt Georgia,'Times New Roman',serif;color:#fff;display:block;max-width:90%;overflow-wrap:anywhere;text-shadow:0 2px 10px rgba(255,255,255,.1)}
+  .recipient:after{content:"";display:block;width:58%;height:.45mm;margin:3mm auto 0;background:linear-gradient(90deg,transparent,#9bb5d8,#f1f5fb,#9bb5d8,transparent)}
+  .description{margin:4mm auto 0;font:13pt/1.45 Georgia,'Times New Roman',serif;color:#e1e7f0;max-width:205mm}
+  .course{margin:2mm auto 0;font:700 11pt Arial,sans-serif;letter-spacing:1.4px;color:#7ebaff}
+  .bottom{position:absolute;left:13mm;right:13mm;bottom:9mm;display:grid;grid-template-columns:1.05fr .9fr 1.15fr .85fr;gap:5mm;align-items:end;text-align:center}
+  .leader{text-align:left;align-self:end;padding-bottom:2mm}
+  .leader-label{font-size:9pt;font-weight:800;letter-spacing:1.4px;color:#dbe5f3;border-bottom:.35mm solid #6c9ed7;padding-bottom:2mm;margin-bottom:2mm}
+  .leader-name{font-size:10pt;font-weight:700;letter-spacing:.7px;color:#fff}
+  .seal{width:39mm;height:39mm;justify-self:center;align-self:center;filter:drop-shadow(0 0 5px rgba(33,135,255,.22))}
+  .sign{align-self:end;padding-bottom:1mm}
+  .signature-paper{height:18mm;background:#f7f9fd;border-radius:1.5mm;display:flex;align-items:center;justify-content:center;padding:1mm 3mm;box-shadow:0 1mm 3mm rgba(0,0,0,.22)}
+  .signature{display:block;width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply}
+  .sign-label{font-size:8pt;letter-spacing:1.5px;color:#dce8f7;margin-top:1.5mm;border-top:.3mm solid #6c9ed7;padding-top:1.2mm}
+  .datebox{text-align:right;align-self:end;padding-bottom:2mm;color:#eef3fa}
+  .date-label{font-size:9pt;font-weight:800;letter-spacing:1px;color:#a9c9ef;margin-bottom:2mm}
+  .date-value{font-size:11pt;font-weight:700;border-bottom:.35mm solid #6c9ed7;padding-bottom:2mm;white-space:nowrap}
+  .meta-foot{position:absolute;left:14mm;right:14mm;bottom:3mm;text-align:center;font-size:6.5pt;letter-spacing:1.4px;color:#91a0b6}
+  @media print{html,body{width:297mm;height:210mm}.cert{margin:0}.signature-paper{box-shadow:none}}
+  </style></head><body><div class="cert"><div class="frame"><div class="corner tl"></div><div class="corner br"></div><div class="brand">DASTURLASH KURSI</div><div class="created">CREATED BY SOBIROV</div><div class="title">SERTIFIKAT</div><div class="ribbon">Ushbu sertifikat</div><div class="recipient">${safe(c.fullName)}</div><div class="description">“${safe(c.courseTitle)}” o‘quv kursini muvaffaqiyatli yakunlagani<br>va dasturlash bo‘yicha bilim hamda ko‘nikmalarni egallagani uchun</div><div class="course">TEST NATIJASI: ${safe(c.percent)}%</div>
+  <div class="bottom"><div class="leader"><div class="leader-label">SAYT RAHBARI</div><div class="leader-name">SOBIROV MUHAMMADUMAR</div></div>
+  <svg class="seal" viewBox="0 0 200 200" role="img" aria-label="Dasturlash Kursi Created by Sobirov muhri"><defs><linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8fd1ff"/><stop offset=".48" stop-color="#1769d2"/><stop offset="1" stop-color="#d8e8ff"/></linearGradient><path id="topArc" d="M 28 100 A 72 72 0 0 1 172 100"/><path id="bottomArc" d="M 172 103 A 72 72 0 0 1 28 103"/></defs><circle cx="100" cy="100" r="94" fill="#07142b" stroke="url(#ring)" stroke-width="5"/><circle cx="100" cy="100" r="84" fill="none" stroke="#d7e8ff" stroke-width="2"/><circle cx="100" cy="100" r="65" fill="#081b3a" stroke="#318be8" stroke-width="2"/><text fill="#f1f6ff" font-size="13" font-weight="700" letter-spacing="1.2"><textPath href="#topArc" startOffset="50%" text-anchor="middle">DASTURLASH KURSI</textPath></text><text fill="#f1f6ff" font-size="11" font-weight="700" letter-spacing=".9"><textPath href="#bottomArc" startOffset="50%" text-anchor="middle">CREATED BY SOBIROV</textPath></text><text x="100" y="111" text-anchor="middle" fill="#72bdff" font-size="48" font-weight="800">&lt;/&gt;</text><path d="M100 126l4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1z" fill="#e8f2ff"/></svg>
+  <div class="sign"><div class="signature-paper"><img class="signature" src="/certificate-signature.png" alt="Sayt rahbarining haqiqiy imzosi"></div><div class="sign-label">IMZO</div></div>
+  <div class="datebox"><div class="date-label">SANA</div><div class="date-value">${safe(date)}</div></div></div>
+  <div class="meta-foot">SERTIFIKAT RAQAMI: ${safe(c.id)} &nbsp;·&nbsp; DASTURLASH KURSI — TA’LIM VA AMALIYOT</div></div></div><script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`);w.document.close();
 }
 
 async function showNotifs() {

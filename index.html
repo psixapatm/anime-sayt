@@ -8,6 +8,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="uz">
 <head>
@@ -547,13 +548,16 @@ async function showProfile() {
   try { me = await api('/api/me'); applyPrefs(readPrefs()); } catch { return logout(); }
   const recentBox=el('div',{className:'profile-grid'});
   const isOwner=me.owner===true;
-  const name=el('input',{value:me.profileName||'',placeholder:'Nik yoki ism-familiyangiz',maxLength:80});
+  const name=el('input',{value:me.profileName||'',placeholder:'Ism Familiya',maxLength:80});
   let selectedBadge=me.badge||'none';const badge=el('div',{className:'badge-picker'});
   const badgeItems=[['none','<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.5 3.1-5.3 7-5.3s6.3 1.8 7 5.3"/></svg>','Oddiy'],['crown',iconSvg('crown'),'Toj'],['star','✦','Yulduz'],['fire','♨','Olov'],['diamond','◆','Olmos'],['code','</>','Kod']];
   const drawBadges=()=>badge.replaceChildren(...badgeItems.map(([v,ico,label])=>el('button',{type:'button',className:'badge-choice'+(selectedBadge===v?' selected':''),disabled:!me.pro&&v!=='none',title:label,innerHTML:'<span class="badge-orb">'+ico+'</span><small>'+label+'</small>',onclick:()=>{selectedBadge=v;drawBadges();}})));drawBadges();
   const status=el('div',{className:'sub'});
   const save=el('button',{className:'pri',textContent:'Profilni saqlash',onclick:async()=>{try{
-    await api('/api/profile','PUT',{profileName:name.value,badge:selectedBadge});
+    const changedName=name.value.trim()!==(me.profileName||'').trim();
+    let currentPassword='';
+    if(changedName){currentPassword=prompt('Ismni o‘zgartirishni tasdiqlash uchun joriy parolingizni kiriting:');if(currentPassword===null)return;}
+    await api('/api/profile','PUT',{profileName:name.value,badge:selectedBadge,currentPassword});
     me=await api('/api/me');status.textContent='Profil saqlandi.';showProfile();setNav();
   }catch(e){status.textContent=e.message;}}});
   const proUntil=me.pro&&me.proUntil?new Date(me.proUntil).toLocaleDateString():'Faol emas';
@@ -575,7 +579,7 @@ async function showProfile() {
   const prefSection=el('section',{className:'profile-card'},el('h3',{innerHTML:iconLabel('palette','Shaxsiy dizayn sozlamalari')}),el('p',{className:'sub',textContent:'Rang, shrift va o‘lcham faqat sizning profilingizda saqlanadi.'}),el('label',{textContent:'Asosiy rang'}),colorSelect,el('label',{textContent:'Shrift turi'}),fontSelect,el('label',{textContent:'Shrift o‘lchami'}),sizeSelect,el('label',{textContent:'Rejim'}),themeSelect,savePrefsBtn);
   $('#app').replaceChildren(head,xpCard,
     el('section',{className:'profile-card'},el('h3',{textContent:'Obuna holati'}),el('p',{textContent:me.pro?'Pro obunangiz '+proUntil+' gacha faol.':'Sizda hozircha Pro obuna yo‘q.'}),el('button',{className:'pri',textContent:'Obunani boshqarish',onclick:()=>showPlans()})),
-    el('section',{className:'profile-card'},el('h3',{textContent:'Profil imkoniyatlari'}),el('label',{textContent:'Profil niki / sertifikatdagi ism'}),name,el('p',{className:'sub',textContent:'Nikni istalgan vaqtda almashtirishingiz mumkin. Haqoratli, odobsiz yoki taqiqlangan so‘zlardan foydalanish mumkin emas.'}),el('label',{textContent:'Profil belgisi'+(me.pro?'':' (Pro obuna uchun)')}),badge,save,status),
+    el('section',{className:'profile-card'},el('h3',{textContent:'Profil imkoniyatlari'}),el('label',{textContent:'Profil niki / sertifikatdagi ism'}),name,el('p',{className:'sub',textContent:'Ism-familiyangizni istalgan vaqtda almashtirishingiz mumkin. Faqat harflar va bo‘sh joylardan foydalaning. Haqoratli yoki odobsiz so‘zlar taqiqlanadi.'}),el('label',{textContent:'Profil belgisi'+(me.pro?'':' (Pro obuna uchun)')}),badge,save,status),
     el('section',{className:'profile-card'},el('h3',{textContent:'Akaunt xavfsizligi'}),accountOpen),prefSection,
     el('section',{className:'profile-card'},el('h3',{textContent:'Oxirgi ko‘rilgan 5 ta kurs'}),recentBox),
     el('section',{className:'profile-card'},el('h3',{textContent:'Sertifikat olish uchun test'}),testsBox),
@@ -840,9 +844,9 @@ async function takeTest(id){
         const out=el('section',{className:'profile-card test-result'},el('h2',{textContent:'Test natijasi'}),el('div',{className:'test-score',textContent:`${r.percent}%`}),el('p',{textContent:`To‘g‘ri javoblar: ${r.correct}/${r.total}. Kerakli natija: ${r.required}%.`}),el('p',{textContent:r.passed?'Tabriklaymiz! Sertifikat olish huquqini qo‘lga kiritdingiz.':'Afsus, bu safar kerakli foizni to‘play olmadingiz.'}));
         if(r.passed){
           let current=await api('/api/me');
-          if(!current.profileName){const entered=prompt('Sertifikatda ko‘rinishi uchun ism-familiyangizni kiriting:');if(entered&&entered.trim().length>=2){await api('/api/profile','PUT',{profileName:entered.trim(),badge:current.badge||'none'});current=await api('/api/me');}}
+          if(!current.profileName){const entered=prompt('Sertifikatda ko‘rinishi uchun ism-familiyangizni kiriting:');if(entered&&entered.trim().length>=2){const currentPassword=prompt('Ismni saqlashni tasdiqlash uchun joriy parolingizni kiriting:');if(currentPassword!==null){await api('/api/profile','PUT',{profileName:entered.trim(),badge:current.badge||'none',currentPassword});current=await api('/api/me');}}}
           const certActions=el('div',{className:'test-result-actions'});
-          const editName=el('button',{textContent:'✏️ Ismni tahrirlash',disabled:!current.profileName,onclick:async()=>{const changed=prompt('Sertifikatda ko‘rinadigan yangi nik yoki ismni kiriting:',current.profileName);if(!changed||changed.trim().length<2)return;try{await api('/api/profile','PUT',{profileName:changed.trim(),badge:current.badge||'none'});current=await api('/api/me');out.querySelector('.cert-owner').textContent='Sertifikat egasi: '+current.profileName;editName.textContent='✏️ Ismni yana tahrirlash';}catch(e){alert(e.message);}}});
+          const editName=el('button',{textContent:'✏️ Ismni tahrirlash',disabled:!current.profileName,onclick:async()=>{const changed=prompt('Sertifikatda ko‘rinadigan yangi ism-familiyani kiriting:',current.profileName);if(!changed||changed.trim().length<2)return;const currentPassword=prompt('Ismni o‘zgartirishni tasdiqlash uchun joriy parolingizni kiriting:');if(currentPassword===null)return;try{await api('/api/profile','PUT',{profileName:changed.trim(),badge:current.badge||'none',currentPassword});current=await api('/api/me');out.querySelector('.cert-owner').textContent='Sertifikat egasi: '+current.profileName;editName.textContent='✏️ Ismni yana tahrirlash';}catch(e){alert(e.message);}}});
           const getCert=el('button',{className:'pri',innerHTML:iconLabel('medal','Sertifikatni yuklab olish'),disabled:!current.profileName,onclick:async()=>{try{const cert=await api('/api/certificates','POST',{testId:id});printCertificate(cert);showProfile();}catch(e){alert(e.message);}}});
           if(current.profileName)out.append(el('p',{className:'cert-owner',textContent:'Sertifikat egasi: '+current.profileName}));else out.append(el('p',{className:'sub',textContent:'Sertifikat olish uchun profilingizda ism-familiya saqlashingiz kerak.'}));
           certActions.append(editName,getCert);out.append(certActions);

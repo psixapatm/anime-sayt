@@ -8,6 +8,7 @@
 
 
 
+
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -305,14 +306,15 @@ app.put('/api/profile', auth, wrap(async (req, res) => {
   const profileName = String(req.body.profileName || '').trim().replace(/\s+/g, ' ').slice(0, 80);
   const badge = String(req.body.badge || 'none');
   const allowed = ['none','crown','star','fire','diamond','code'];
-  if (profileName && !/^[\p{L}\p{N} ._'’\-]{2,80}$/u.test(profileName)) return res.status(400).json({ error: 'Nik 2–80 belgi bo‘lsin; harf, raqam, bo‘sh joy, nuqta, tire yoki pastki chiziqdan foydalaning.' });
+  if (profileName && (profileName.length < 2 || profileName.length > 80)) return res.status(400).json({ error: 'Ism-familiya 2–80 belgidan iborat bo‘lishi kerak.' });
   if (profileName && !isCleanNickname(profileName)) return res.status(400).json({ error: 'Bu nik odob-axloq qoidalariga mos emas. Iltimos, boshqa nik tanlang.' });
   if (!allowed.includes(badge)) return res.status(400).json({ error: 'Belgi noto‘g‘ri.' });
   const u = await users.findOne({ id: req.user.id });
   if (badge !== 'none' && (u.proUntil || 0) <= Date.now()) return res.status(403).json({ error: 'Profil bezaklari faqat faol Pro obunachilar uchun.' });
   const oldName = String(u.profileName || '').trim();
-  const nameChanged = !!oldName && profileName !== oldName;
+  const nameChanged = profileName !== oldName;
   if (oldName && !profileName) return res.status(400).json({ error: 'Ism-familiyani bo‘sh qoldirib bo‘lmaydi.' });
+  if (nameChanged && !bcrypt.compareSync(String(req.body.currentPassword || ''), u.hash)) return res.status(401).json({ error: 'Ismni o‘zgartirish uchun joriy parolingizni to‘g‘ri kiriting.' });
   const set = { badge, profileName };
   if (profileName !== oldName && Array.isArray(u.certificates) && u.certificates.length) {
     set.certificates = u.certificates.map(c => ({ ...c, fullName: profileName }));

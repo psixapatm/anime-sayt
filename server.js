@@ -8,11 +8,6 @@
 
 
 
-
-
-
-
-
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -45,6 +40,7 @@ const wrap = (fn) => (req, res) => fn(req, res).catch(e => {
 const sign = (u) => jwt.sign({ id: u.id, username: u.username, role: u.role }, SECRET, { expiresIn: '30d' });
 const badLoginWords = ['fuck','shit','bitch','asshole','сука','бляд','хуй','пизд','еба','ахмок','ахмоқ','каллакесар','хароми','haromi','iflos','ahmoq','axmoq','suka','blyad','xuy','pizd','ebla'];
 const isCleanLogin = (value) => { const v = String(value || '').toLowerCase().replace(/[_0-9]/g, ''); return !badLoginWords.some(w => v.includes(w)); };
+const isCleanNickname = (value) => { const v = String(value || '').toLocaleLowerCase().replace(/[\s._'’\-0-9]/gu, ''); return !badLoginWords.some(w => v.includes(w)); };
 
 
 function auth(req, res, next) {
@@ -304,27 +300,25 @@ app.post('/api/anime/:id/view', auth, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// Profil: ism-familiya bir marta tahrirlanadi; PRO bezagi.
+// Profil: nik istalgan vaqtda tahrirlanadi; odob-axloq filtri va PRO bezagi.
 app.put('/api/profile', auth, wrap(async (req, res) => {
   const profileName = String(req.body.profileName || '').trim().replace(/\s+/g, ' ').slice(0, 80);
   const badge = String(req.body.badge || 'none');
   const allowed = ['none','crown','star','fire','diamond','code'];
-  if (profileName && !/^[\p{L} .'-]{2,80}$/u.test(profileName)) return res.status(400).json({ error: 'Ism-familiyani tekshiring.' });
+  if (profileName && !/^[\p{L}\p{N} ._'’\-]{2,80}$/u.test(profileName)) return res.status(400).json({ error: 'Nik 2–80 belgi bo‘lsin; harf, raqam, bo‘sh joy, nuqta, tire yoki pastki chiziqdan foydalaning.' });
+  if (profileName && !isCleanNickname(profileName)) return res.status(400).json({ error: 'Bu nik odob-axloq qoidalariga mos emas. Iltimos, boshqa nik tanlang.' });
   if (!allowed.includes(badge)) return res.status(400).json({ error: 'Belgi noto‘g‘ri.' });
   const u = await users.findOne({ id: req.user.id });
   if (badge !== 'none' && (u.proUntil || 0) <= Date.now()) return res.status(403).json({ error: 'Profil bezaklari faqat faol Pro obunachilar uchun.' });
   const oldName = String(u.profileName || '').trim();
   const nameChanged = !!oldName && profileName !== oldName;
   if (oldName && !profileName) return res.status(400).json({ error: 'Ism-familiyani bo‘sh qoldirib bo‘lmaydi.' });
-  const isOwner = !!req.user.owner;
-  if (nameChanged && !isOwner && (u.certificates || []).length) return res.status(403).json({ error: 'Sertifikat berilgandan keyin ismni o‘zgartirib bo‘lmaydi.' });
-  if (nameChanged && !isOwner && u.profileNameEditUsed) return res.status(403).json({ error: 'Ismni tahrirlash imkoniyati bir marta ishlatilgan.' });
-  if (nameChanged) { const currentPassword = String(req.body.currentPassword || ''); if (!currentPassword || !bcrypt.compareSync(currentPassword, u.hash)) return res.status(401).json({ error: 'Ismni tahrirlash uchun akkaunt parolingizni kiriting.' }); }
-  const set = { badge };
-  if (!oldName || profileName === oldName || nameChanged) set.profileName = profileName;
-  if (nameChanged && !isOwner) set.profileNameEditUsed = true;
-  await users.updateOne({ id: req.user.id }, { $set: set });
-  res.json({ ok: true, profileName: set.profileName ?? oldName, badge, profileNameEditUsed: !!(u.profileNameEditUsed || nameChanged) });
+  const set = { badge, profileName };
+  if (profileName !== oldName && Array.isArray(u.certificates) && u.certificates.length) {
+    set.certificates = u.certificates.map(c => ({ ...c, fullName: profileName }));
+  }
+  await users.updateOne({ id: req.user.id }, { $set: set, $unset: { profileNameEditUsed: '' } });
+  res.json({ ok: true, profileName: set.profileName, badge, profileNameEditUsed: false });
 }));
 
 // Login/parolni o‘zgartirish: tasdiqlash kodi faqat foydalanuvchining ulangan Telegram chatiga yuboriladi.
@@ -1009,7 +1003,6 @@ async function pollTelegram() {
   );
   app.listen(process.env.PORT || 3000, () => { console.log('Sayt ishga tushdi'); if (TELEGRAM_BOT_TOKEN) { if (!ADMIN_TELEGRAM_ID) console.warn('ADMIN_TELEGRAM_ID kiritilmagan: admin xabarlari va anonim murojaatlar ishlamaydi.'); pollTelegram(); } else console.warn('TELEGRAM_BOT_TOKEN kiritilmagan: Telegram tasdiqlash o‘chiq.'); });
 })().catch(e => { console.error('Bazaga ulanib bo\'lmadi:', e.message); process.exit(1); });
-
 
 
 

@@ -7,8 +7,6 @@
 
 
 
-
-
 <!DOCTYPE html>
 <html lang="uz">
 <head>
@@ -350,6 +348,65 @@ button,input,textarea,select{font-family:inherit}button{font-weight:700}button:f
 .forgot-link[hidden],.profile-name-password[hidden]{display:none!important}
 .profile-name-password{margin:10px 0 14px}
 .profile-name-password input{display:block;width:100%;margin-top:6px}
+
+
+
+/* ===== REFINED LEADERBOARD ===== */
+.rank-shell{width:100%;max-width:1120px;margin:0 auto;display:grid;gap:18px}
+.rank-hero{position:relative;overflow:hidden;padding:clamp(22px,3.5vw,34px);border:1px solid color-mix(in srgb,var(--acc) 22%,var(--line));border-radius:24px;background:linear-gradient(115deg,#111a2e 0%,#182b49 58%,#16414a 100%);color:#f7f9ff;box-shadow:0 16px 42px rgba(5,15,35,.18)}
+.rank-hero:after{content:"";position:absolute;width:280px;height:280px;right:-100px;top:-150px;border-radius:50%;border:1px solid #ffffff18;box-shadow:0 0 0 28px #ffffff08,0 0 0 58px #ffffff05;pointer-events:none}
+.rank-kicker{display:flex;align-items:center;gap:9px;font-size:10px;font-weight:900;letter-spacing:.16em;color:#a9c4e8}
+.rank-kicker-dot,.rank-live-dot{width:7px;height:7px;border-radius:50%;background:#4ce0c2;box-shadow:0 0 0 4px #4ce0c21c}
+.rank-hero-copy{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:20px;margin:20px 0 24px}
+.rank-hero h1{max-width:700px;margin:0;font-size:clamp(27px,4vw,43px);line-height:1.08;letter-spacing:-.045em;color:#fff}
+.rank-hero p{max-width:650px;margin:10px 0 0;color:#c1cee0;font-size:14px;line-height:1.65}
+.rank-hero-mark{width:76px;height:76px;flex:0 0 76px;border-radius:22px;display:grid;place-items:center;color:#f3d78f;background:#ffffff12;border:1px solid #ffffff25;box-shadow:inset 0 1px #ffffff20}
+.rank-hero-mark .ui-icon{width:39px;height:39px;stroke-width:1.6}
+.rank-summary{position:relative;z-index:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.rank-summary-item{display:flex;align-items:center;gap:11px;min-width:0;padding:13px 15px;border:1px solid #ffffff20;border-radius:15px;background:#ffffff0c}
+.rank-summary-item>.ui-icon{width:21px;height:21px;flex:0 0 21px;color:#8ee5d9}
+.rank-summary-item span{display:grid;gap:3px;min-width:0}
+.rank-summary-item b{font-size:20px;line-height:1.1;color:#fff;font-variant-numeric:tabular-nums}
+.rank-summary-item small{font-size:11px;color:#c1cee0}
+.rank-podium-section,.rank-list-panel{min-width:0;padding:clamp(17px,2.7vw,24px);border:1px solid var(--line);border-radius:21px;background:var(--card);box-shadow:var(--shadow)}
+.rank-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:17px}
+.rank-eyebrow{font-size:10px;font-weight:900;letter-spacing:.14em;color:var(--acc)}
+.rank-section-heading h2{margin:5px 0 0;font-size:clamp(19px,2.8vw,24px);letter-spacing:-.03em}
+.rank-live-tag{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid var(--line);border-radius:99px;color:var(--mut);font-size:10px;font-weight:800;white-space:nowrap}
+.rank-podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;align-items:stretch;padding-top:3px}
+.rank-podium-card{position:relative;display:flex;flex-direction:column;align-items:center;min-width:0;padding:19px 12px 13px;border:1px solid var(--line);border-radius:17px;background:var(--bg);text-align:center}
+.rank-podium-card.rank-place-1{border-color:#d7b45d;background:linear-gradient(180deg,#d7b45d16,var(--bg));box-shadow:inset 0 3px #d7b45d}
+.rank-podium-medal{position:absolute;top:10px;right:11px;width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:#64748b18;color:var(--mut);font-weight:900;font-size:12px}
+.rank-place-1 .rank-podium-medal{background:#d7b45d;color:#4b3510}
+.rank-place-2 .rank-podium-medal{background:#9aaabd30;color:#77869a}
+.rank-place-3 .rank-podium-medal{background:#bd825b25;color:#a66a42}
+.rank-podium-avatar,.rank-user-avatar{display:grid;place-items:center;flex:0 0 auto;border-radius:50%;font-weight:900;color:#fff;background:linear-gradient(145deg,var(--acc),var(--acc2))}
+.rank-podium-avatar{width:54px;height:54px;margin:2px 0 10px;font-size:21px;box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 12%,var(--card))}
+.rank-place-1 .rank-podium-avatar{width:60px;height:60px;font-size:24px;background:linear-gradient(145deg,#e9c46a,#a9772c);box-shadow:0 0 0 5px #d5ad5420}
+.rank-podium-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.rank-podium-xp{margin:5px 0 0;color:var(--mut);font-size:11px;font-weight:800}
+.rank-podium-base{margin-top:10px;padding:5px 11px;border-radius:99px;background:color-mix(in srgb,var(--acc) 10%,var(--card));font-size:10px;font-weight:900;color:var(--mut)}
+.rank-place-1 .rank-podium-base{background:#d5ad5424;color:#b58a35}
+.rank-list{display:grid;gap:7px}
+.rank-row{display:grid;grid-template-columns:38px 40px minmax(0,1fr) minmax(110px,180px);align-items:center;gap:12px;padding:11px 13px;border:1px solid var(--line);border-radius:14px;background:var(--bg);transition:border-color .18s,background .18s}
+.rank-row:hover{border-color:color-mix(in srgb,var(--acc) 45%,var(--line));background:color-mix(in srgb,var(--acc) 4%,var(--bg))}
+.rank-row.is-me{border-color:color-mix(in srgb,var(--acc) 65%,var(--line));background:color-mix(in srgb,var(--acc) 8%,var(--card));box-shadow:inset 3px 0 var(--acc)}
+.rank-number{font-size:12px;font-weight:900;color:var(--mut);text-align:center;font-variant-numeric:tabular-nums}
+.rank-number.top-rank{color:var(--acc)}
+.rank-user-avatar{width:38px;height:38px;font-size:14px;background:linear-gradient(145deg,#5367b8,#20a9a8)}
+.rank-user-info{display:grid;gap:3px;min-width:0}
+.rank-user-info b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.rank-user-info small{font-size:10px;color:var(--mut)}
+.rank-xp-wrap{display:grid;gap:6px;justify-items:end}
+.rank-xp-wrap>b{font-size:11px;font-variant-numeric:tabular-nums}
+.rank-xp-track{width:100%;height:5px;border-radius:99px;overflow:hidden;background:var(--line)}
+.rank-xp-track span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.rank-empty{padding:42px 18px;text-align:center;border:1px dashed var(--line);border-radius:20px;background:var(--card)}
+.rank-empty-icon{width:62px;height:62px;margin:0 auto 14px;border-radius:19px;display:grid;place-items:center;color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,var(--card))}
+.rank-empty-icon .ui-icon{width:31px;height:31px}
+.rank-empty h2{margin:0 0 8px}.rank-empty p{max-width:460px;margin:auto;color:var(--mut);line-height:1.6}
+@media(max-width:650px){.rank-shell{gap:13px}.rank-hero{padding:20px;border-radius:20px}.rank-hero-copy{margin:17px 0 19px;gap:8px}.rank-hero-mark{width:58px;height:58px;flex-basis:58px;border-radius:17px}.rank-hero-mark .ui-icon{width:30px;height:30px}.rank-summary{gap:7px}.rank-summary-item{padding:10px 9px;gap:7px}.rank-summary-item>.ui-icon{width:17px;height:17px;flex-basis:17px}.rank-summary-item b{font-size:16px}.rank-summary-item small{font-size:9px}.rank-podium{gap:7px}.rank-podium-card{padding:16px 5px 10px}.rank-podium-avatar{width:43px;height:43px;font-size:17px}.rank-place-1 .rank-podium-avatar{width:49px;height:49px;font-size:20px}.rank-podium-name{font-size:11px}.rank-podium-xp{font-size:10px}.rank-podium-medal{top:7px;right:7px;width:21px;height:21px;font-size:10px}.rank-row{grid-template-columns:27px 33px minmax(0,1fr) minmax(78px,105px);gap:8px;padding:9px 8px}.rank-user-avatar{width:32px;height:32px}.rank-user-info b{font-size:11px}.rank-user-info small{font-size:9px}.rank-xp-wrap>b{font-size:10px}.rank-live-tag{font-size:9px;padding:6px 8px}}
+@media(max-width:390px){.rank-hero-mark{display:none}.rank-summary-item{flex-direction:column;align-items:flex-start}.rank-row{grid-template-columns:24px 30px minmax(0,1fr) 76px}.rank-user-avatar{width:29px;height:29px}.rank-xp-track{height:4px}}
 
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
@@ -866,62 +923,6 @@ function printCertificate(c){
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Sertifikat</title><style>@page{size:A4 landscape;margin:0}*{box-sizing:border-box}body{margin:0;background:#eef1f8;font-family:Georgia,serif}.cert{width:297mm;height:210mm;margin:auto;padding:17mm;background:linear-gradient(135deg,#101d3c,#172d58);color:#fff}.frame{height:100%;border:3px solid #d8b765;outline:1px solid #d8b765;outline-offset:-9px;text-align:center;padding:22mm 18mm;position:relative}.small{letter-spacing:5px;color:#e5c979;font: bold 13px Arial}.title{font-size:42px;letter-spacing:5px;color:#f0d58a;margin:12px}.name{font-size:34px;border-bottom:1px solid #d8b765;display:inline-block;padding:8px 45px;margin:12px}.course{font-size:23px;color:#d7e5ff;margin:15px}.foot{display:flex;justify-content:space-between;margin-top:23px;font:14px Arial}.seal{color:#e5c979;font-size:12px}@media print{body{background:white}}
 .icon-btn{width:42px;min-width:42px;padding:6px;border-radius:14px;font-size:23px;line-height:1;background:var(--card);display:inline-flex;align-items:center;justify-content:center}.pro-pill{border-radius:999px}.profile-card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;margin:14px 0;box-shadow:var(--shadow)}.profile-symbol{width:76px;height:76px;border-radius:24px;background:linear-gradient(135deg,#6655df,#19a5a5);display:grid;place-items:center;font-size:36px;color:white}.profile-card:first-child{display:flex;align-items:center;gap:18px}.profile-pro{color:#a9790c;font-weight:900}.profile-free{color:var(--mut);font-weight:800}.profile-card input,.profile-card select,.profile-card textarea{width:100%;padding:12px;margin:7px 0 12px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}.profile-grid{display:grid;gap:9px}.profile-course,.test-option{padding:10px;border:1px solid var(--line);border-radius:12px;margin:5px 0}.profile-course{cursor:pointer}.test-option{display:flex;align-items:center;gap:8px}.test-option input{width:auto;margin:0}@media(max-width:640px){.profile-card{padding:15px}.icon-btn{width:38px;min-width:38px}}
 
-/* ===== REFINED LEADERBOARD ===== */
-.rank-shell{width:100%;max-width:1120px;margin:0 auto;display:grid;gap:18px}
-.rank-hero{position:relative;overflow:hidden;padding:clamp(22px,3.5vw,34px);border:1px solid color-mix(in srgb,var(--acc) 22%,var(--line));border-radius:24px;background:linear-gradient(115deg,#111a2e 0%,#182b49 58%,#16414a 100%);color:#f7f9ff;box-shadow:0 16px 42px rgba(5,15,35,.18)}
-.rank-hero:after{content:"";position:absolute;width:280px;height:280px;right:-100px;top:-150px;border-radius:50%;border:1px solid #ffffff18;box-shadow:0 0 0 28px #ffffff08,0 0 0 58px #ffffff05;pointer-events:none}
-.rank-kicker{display:flex;align-items:center;gap:9px;font-size:10px;font-weight:900;letter-spacing:.16em;color:#a9c4e8}
-.rank-kicker-dot,.rank-live-dot{width:7px;height:7px;border-radius:50%;background:#4ce0c2;box-shadow:0 0 0 4px #4ce0c21c}
-.rank-hero-copy{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:20px;margin:20px 0 24px}
-.rank-hero h1{max-width:700px;margin:0;font-size:clamp(27px,4vw,43px);line-height:1.08;letter-spacing:-.045em;color:#fff}
-.rank-hero p{max-width:650px;margin:10px 0 0;color:#c1cee0;font-size:14px;line-height:1.65}
-.rank-hero-mark{width:76px;height:76px;flex:0 0 76px;border-radius:22px;display:grid;place-items:center;color:#f3d78f;background:#ffffff12;border:1px solid #ffffff25;box-shadow:inset 0 1px #ffffff20}
-.rank-hero-mark .ui-icon{width:39px;height:39px;stroke-width:1.6}
-.rank-summary{position:relative;z-index:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.rank-summary-item{display:flex;align-items:center;gap:11px;min-width:0;padding:13px 15px;border:1px solid #ffffff20;border-radius:15px;background:#ffffff0c}
-.rank-summary-item>.ui-icon{width:21px;height:21px;flex:0 0 21px;color:#8ee5d9}
-.rank-summary-item span{display:grid;gap:3px;min-width:0}
-.rank-summary-item b{font-size:20px;line-height:1.1;color:#fff;font-variant-numeric:tabular-nums}
-.rank-summary-item small{font-size:11px;color:#c1cee0}
-.rank-podium-section,.rank-list-panel{min-width:0;padding:clamp(17px,2.7vw,24px);border:1px solid var(--line);border-radius:21px;background:var(--card);box-shadow:var(--shadow)}
-.rank-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:17px}
-.rank-eyebrow{font-size:10px;font-weight:900;letter-spacing:.14em;color:var(--acc)}
-.rank-section-heading h2{margin:5px 0 0;font-size:clamp(19px,2.8vw,24px);letter-spacing:-.03em}
-.rank-live-tag{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid var(--line);border-radius:99px;color:var(--mut);font-size:10px;font-weight:800;white-space:nowrap}
-.rank-podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;align-items:stretch;padding-top:3px}
-.rank-podium-card{position:relative;display:flex;flex-direction:column;align-items:center;min-width:0;padding:19px 12px 13px;border:1px solid var(--line);border-radius:17px;background:var(--bg);text-align:center}
-.rank-podium-card.rank-place-1{border-color:#d7b45d;background:linear-gradient(180deg,#d7b45d16,var(--bg));box-shadow:inset 0 3px #d7b45d}
-.rank-podium-medal{position:absolute;top:10px;right:11px;width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:#64748b18;color:var(--mut);font-weight:900;font-size:12px}
-.rank-place-1 .rank-podium-medal{background:#d7b45d;color:#4b3510}
-.rank-place-2 .rank-podium-medal{background:#9aaabd30;color:#77869a}
-.rank-place-3 .rank-podium-medal{background:#bd825b25;color:#a66a42}
-.rank-podium-avatar,.rank-user-avatar{display:grid;place-items:center;flex:0 0 auto;border-radius:50%;font-weight:900;color:#fff;background:linear-gradient(145deg,var(--acc),var(--acc2))}
-.rank-podium-avatar{width:54px;height:54px;margin:2px 0 10px;font-size:21px;box-shadow:0 0 0 4px color-mix(in srgb,var(--acc) 12%,var(--card))}
-.rank-place-1 .rank-podium-avatar{width:60px;height:60px;font-size:24px;background:linear-gradient(145deg,#e9c46a,#a9772c);box-shadow:0 0 0 5px #d5ad5420}
-.rank-podium-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
-.rank-podium-xp{margin:5px 0 0;color:var(--mut);font-size:11px;font-weight:800}
-.rank-podium-base{margin-top:10px;padding:5px 11px;border-radius:99px;background:color-mix(in srgb,var(--acc) 10%,var(--card));font-size:10px;font-weight:900;color:var(--mut)}
-.rank-place-1 .rank-podium-base{background:#d5ad5424;color:#b58a35}
-.rank-list{display:grid;gap:7px}
-.rank-row{display:grid;grid-template-columns:38px 40px minmax(0,1fr) minmax(110px,180px);align-items:center;gap:12px;padding:11px 13px;border:1px solid var(--line);border-radius:14px;background:var(--bg);transition:border-color .18s,background .18s}
-.rank-row:hover{border-color:color-mix(in srgb,var(--acc) 45%,var(--line));background:color-mix(in srgb,var(--acc) 4%,var(--bg))}
-.rank-row.is-me{border-color:color-mix(in srgb,var(--acc) 65%,var(--line));background:color-mix(in srgb,var(--acc) 8%,var(--card));box-shadow:inset 3px 0 var(--acc)}
-.rank-number{font-size:12px;font-weight:900;color:var(--mut);text-align:center;font-variant-numeric:tabular-nums}
-.rank-number.top-rank{color:var(--acc)}
-.rank-user-avatar{width:38px;height:38px;font-size:14px;background:linear-gradient(145deg,#5367b8,#20a9a8)}
-.rank-user-info{display:grid;gap:3px;min-width:0}
-.rank-user-info b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
-.rank-user-info small{font-size:10px;color:var(--mut)}
-.rank-xp-wrap{display:grid;gap:6px;justify-items:end}
-.rank-xp-wrap>b{font-size:11px;font-variant-numeric:tabular-nums}
-.rank-xp-track{width:100%;height:5px;border-radius:99px;overflow:hidden;background:var(--line)}
-.rank-xp-track span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--acc),var(--acc2))}
-.rank-empty{padding:42px 18px;text-align:center;border:1px dashed var(--line);border-radius:20px;background:var(--card)}
-.rank-empty-icon{width:62px;height:62px;margin:0 auto 14px;border-radius:19px;display:grid;place-items:center;color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,var(--card))}
-.rank-empty-icon .ui-icon{width:31px;height:31px}
-.rank-empty h2{margin:0 0 8px}.rank-empty p{max-width:460px;margin:auto;color:var(--mut);line-height:1.6}
-@media(max-width:650px){.rank-shell{gap:13px}.rank-hero{padding:20px;border-radius:20px}.rank-hero-copy{margin:17px 0 19px;gap:8px}.rank-hero-mark{width:58px;height:58px;flex-basis:58px;border-radius:17px}.rank-hero-mark .ui-icon{width:30px;height:30px}.rank-summary{gap:7px}.rank-summary-item{padding:10px 9px;gap:7px}.rank-summary-item>.ui-icon{width:17px;height:17px;flex-basis:17px}.rank-summary-item b{font-size:16px}.rank-summary-item small{font-size:9px}.rank-podium{gap:7px}.rank-podium-card{padding:16px 5px 10px}.rank-podium-avatar{width:43px;height:43px;font-size:17px}.rank-place-1 .rank-podium-avatar{width:49px;height:49px;font-size:20px}.rank-podium-name{font-size:11px}.rank-podium-xp{font-size:10px}.rank-podium-medal{top:7px;right:7px;width:21px;height:21px;font-size:10px}.rank-row{grid-template-columns:27px 33px minmax(0,1fr) minmax(78px,105px);gap:8px;padding:9px 8px}.rank-user-avatar{width:32px;height:32px}.rank-user-info b{font-size:11px}.rank-user-info small{font-size:9px}.rank-xp-wrap>b{font-size:10px}.rank-live-tag{font-size:9px;padding:6px 8px}}
-@media(max-width:390px){.rank-hero-mark{display:none}.rank-summary-item{flex-direction:column;align-items:flex-start}.rank-row{grid-template-columns:24px 30px minmax(0,1fr) 76px}.rank-user-avatar{width:29px;height:29px}.rank-xp-track{height:4px}}
 </style></head><body><div class="cert"><div class="frame"><div class="small">DASTURLASH KURSI · TA’LIM SERTIFIKATI</div><div class="title">SERTIFIKAT</div><p>Ushbu sertifikat quyidagi ishtirokchiga beriladi</p><div class="name">${safe(c.fullName)}</div><p>“${safe(c.courseTitle)}” kursini muvaffaqiyatli yakunlagani uchun</p><div class="course">Test natijasi: ${safe(c.percent)}%</div><div class="foot"><div>Berilgan sana: ${new Date(c.created).toLocaleDateString()}<br>Sertifikat № ${safe(c.id)}</div><div class="seal">SAYT RAHBARI<br><b>Sobirov Muhammadumar</b></div></div></div></div><script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close();
 }
 

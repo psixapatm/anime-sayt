@@ -312,29 +312,8 @@ main{padding:clamp(22px,4vw,42px) clamp(16px,5vw,76px) 76px;max-width:1440px}
 /* ===== END VISUAL REFRESH ===== */
 
 
-.learning-stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}.learning-stat-grid>div{padding:16px;border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;gap:5px}.learning-stat-grid strong{font-size:25px}.learning-stat-grid small,.community-post small{color:var(--muted)}.community-feed{display:grid;gap:12px;margin-top:20px}.community-post{border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:12px}.community-post-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.community-post p{white-space:pre-wrap;overflow-wrap:anywhere}.leaderboard-row{display:flex;justify-content:space-between;align-items:center}.roadmap-lesson{padding:7px 10px;border-top:1px solid var(--line);font-size:14px}.code-editor{width:100%;min-height:130px;font:13px/1.5 ui-monospace,monospace;margin:8px 0 16px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text)}.code-preview{width:100%;height:280px;border:1px solid var(--line);border-radius:12px;background:#fff;margin-top:12px}@media(max-width:600px){.learning-stat-grid{grid-template-columns:1fr 1fr}}
-
-/* ===== PREMIUM PLATFORM REDESIGN ===== */
-:root{--acc:#7667ff;--acc2:#20c7bd;--line:#293650;--bg:#080e1c;--ink:#edf3ff;--card:#111b2d;--mut:#9baac2;--shadow:0 22px 70px rgba(0,0,0,.28)}
-:root[data-theme="light"]{--bg:#f3f6fc;--ink:#17243b;--card:#fff;--mut:#687891;--line:#dce4f0;--shadow:0 18px 50px rgba(36,55,90,.10)}
-:root[data-theme="dark"]{--bg:#080e1c;--ink:#edf3ff;--card:#111b2d;--mut:#9baac2;--line:#293650;--acc:#8174ff;--acc2:#20c7bd;--shadow:0 22px 70px rgba(0,0,0,.28)}
-body{background:radial-gradient(ellipse at 12% -10%,color-mix(in srgb,var(--acc) 15%,transparent),transparent 38%),radial-gradient(ellipse at 95% 18%,color-mix(in srgb,var(--acc2) 9%,transparent),transparent 30%),var(--bg);color:var(--ink);letter-spacing:.005em}
-header{padding:13px clamp(18px,4vw,64px);background:color-mix(in srgb,var(--bg) 84%,transparent);border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent);box-shadow:0 8px 30px #00000008}
-.brand{gap:12px}.brand-mark{border-radius:15px;box-shadow:0 8px 26px #6558e833}.logo{font-size:24px;letter-spacing:-1px}.brand-copy .credit{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut)}
-nav{gap:7px}nav button{border-radius:12px;padding:9px 13px;font-size:13px;font-weight:750;background:color-mix(in srgb,var(--card) 82%,transparent);border-color:var(--line);transition:.2s ease}nav button:hover{transform:translateY(-2px);border-color:var(--acc);box-shadow:0 8px 24px color-mix(in srgb,var(--acc) 18%,transparent)}nav button.pri,button.pri{background:linear-gradient(115deg,var(--acc),#4c9eea 58%,var(--acc2));border:0;color:#fff;box-shadow:0 9px 24px color-mix(in srgb,var(--acc) 22%,transparent)}
-main{max-width:1440px;padding:clamp(24px,4vw,58px) clamp(16px,4vw,58px) 80px}.profile-card{border:1px solid var(--line);border-radius:24px;background:linear-gradient(145deg,color-mix(in srgb,var(--card) 96%,var(--acc) 4%),var(--card));box-shadow:var(--shadow);padding:clamp(20px,3vw,34px)}
-button,input,textarea,select{font-family:inherit}button{font-weight:700}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid color-mix(in srgb,var(--acc) 55%,transparent);outline-offset:3px}
-/* Community */
-.community-shell,.ide-shell{width:100%;max-width:1320px;margin:0 auto}.community-hero{position:relative;overflow:hidden;padding:clamp(28px,5vw,58px);border:1px solid var(--line);border-radius:30px;background:linear-gradient(115deg,#111d35 0%,#18294b 58%,#17434a 100%);color:#f5f8ff;box-shadow:0 25px 70px #08152a30}.community-hero:after{content:'{ }';position:absolute;right:6%;top:4%;font:900 clamp(90px,15vw,190px)/1 monospace;color:#ffffff0b;transform:rotate(-10deg);pointer-events:none}.community-kicker,.ide-kicker{font-size:11px;letter-spacing:.2em;font-weight:900;color:#8fe6df;margin-bottom:13px}.community-hero h1,.ide-heading h1{font-size:clamp(30px,4.5vw,54px);line-height:1.04;letter-spacing:-.04em;max-width:760px}.community-hero p,.ide-heading p{color:#bdcbe0;max-width:650px;font-size:16px;margin:15px 0 0}.community-layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:22px;margin-top:24px;align-items:start}.community-main-column{min-width:0;display:grid;gap:20px}.community-composer,.community-feed-panel,.community-side-card{background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow)}.community-composer{padding:22px}.community-composer-top{display:flex;align-items:center;gap:13px;margin-bottom:16px}.community-avatar,.community-post-avatar{width:46px;height:46px;flex:0 0 46px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(135deg,#7667ff,#20b9b4);color:white;font-weight:900;font-size:19px}.community-composer-top b,.community-post-meta b{display:block;font-size:15px}.community-composer-top small{color:var(--mut);font-size:12px}.community-input{display:block;width:100%;min-height:118px;resize:vertical;padding:17px 18px;border:1px solid var(--line);border-radius:16px;background:color-mix(in srgb,var(--bg) 75%,var(--card));color:var(--ink);font:inherit;line-height:1.6}.community-compose-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}.community-status,.community-count{font-size:12px;color:var(--mut)}.community-compose-actions{display:flex;align-items:center;gap:14px}.community-send,.ide-run{border:0;border-radius:13px;padding:12px 18px;background:linear-gradient(115deg,#7567ff,#278edb 60%,#17b9ae);color:#fff;font-weight:800;box-shadow:0 9px 22px #6558e833}.community-send:disabled{opacity:.6;cursor:wait}.community-feed-panel{padding:22px}.community-feed-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:18px}.community-feed-head h2{font-size:23px}.community-feed-head p{font-size:13px;color:var(--mut);margin:3px 0 0}.community-search{width:min(270px,100%);padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}.community-feed{display:grid;gap:12px}.community-post-v2{display:flex;gap:14px;padding:18px;border:1px solid var(--line);border-radius:17px;background:color-mix(in srgb,var(--card) 88%,var(--bg));transition:border-color .2s,transform .2s}.community-post-v2:hover{border-color:color-mix(in srgb,var(--acc) 60%,var(--line));transform:translateY(-2px)}.community-post-avatar{width:42px;height:42px;flex-basis:42px;border-radius:14px;background:linear-gradient(140deg,#1b9caa,#7465ed)}.community-post-content{flex:1;min-width:0}.community-post-meta{display:flex;justify-content:space-between;gap:12px;align-items:center}.community-post-meta small{font-size:11px;color:var(--mut)}.community-post-meta time{font-size:11px;color:var(--mut);white-space:nowrap}.community-post-text{white-space:pre-wrap;overflow-wrap:anywhere;margin:14px 0 16px;line-height:1.7}.community-post-actions{display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:12px}.community-post-tag{font-size:11px;color:var(--mut)}.community-delete{border:0;background:transparent;color:#e16d83;padding:5px 8px;font-size:12px}.community-empty{text-align:center;padding:46px 18px;color:var(--mut)}.community-empty-icon{margin:auto auto 13px;width:54px;height:54px;border-radius:18px;display:grid;place-items:center;background:color-mix(in srgb,var(--acc) 13%,var(--card));color:var(--acc);font-size:26px}.community-empty h3{color:var(--ink)}.community-empty p{font-size:13px}.community-sidebar{display:grid;gap:15px}.community-side-card{padding:22px}.community-side-icon{width:40px;height:40px;display:grid;place-items:center;border-radius:13px;background:color-mix(in srgb,var(--acc) 14%,var(--card));color:var(--acc);font-size:20px}.community-side-card h3{font-size:17px;margin:13px 0 9px}.community-side-card ul{padding-left:18px;color:var(--mut);font-size:13px;line-height:1.8}.community-side-accent{background:linear-gradient(145deg,#20204d,#16434a);color:white;border:0}.community-side-accent small{color:#9fe9df;font-size:10px;letter-spacing:.16em;font-weight:900}.community-side-accent p{color:#c6d4e8;font-size:13px}
-/* Full IDE */
-.ide-heading{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:5px 4px 26px}.ide-heading h1{max-width:850px}.ide-heading p{color:var(--mut)}.ide-heading-mark{width:100px;height:100px;flex:0 0 100px;display:grid;place-items:center;border:1px solid color-mix(in srgb,var(--acc) 35%,var(--line));border-radius:28px;background:linear-gradient(145deg,color-mix(in srgb,var(--acc) 20%,var(--card)),color-mix(in srgb,var(--acc2) 15%,var(--card)));font:900 34px monospace;color:var(--acc);box-shadow:0 15px 45px color-mix(in srgb,var(--acc) 13%,transparent)}.ide-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-bottom:0;border-radius:20px 20px 0 0;flex-wrap:wrap}.ide-tabs,.ide-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.ide-tab{border:1px solid transparent;background:transparent;color:var(--mut);padding:9px 16px;border-radius:11px;font-size:12px;font-weight:900;letter-spacing:.08em}.ide-tab.active{color:#fff;background:#252f4b;border-color:#384665}.ide-quiet{background:transparent;color:var(--mut);border-color:var(--line);font-size:12px;padding:9px 12px}.ide-run{padding:10px 16px}.ide-workspace{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);border:1px solid var(--line);border-radius:0 0 20px 20px;overflow:hidden;background:#0b1220;min-height:620px;box-shadow:var(--shadow)}.ide-editor-panel,.ide-preview-panel{min-width:0;display:flex;flex-direction:column}.ide-editor-panel{border-right:1px solid #26334b}.ide-panel-title{min-height:46px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#121d31;color:#dce7fa;border-bottom:1px solid #26334b;font-size:11px;font-weight:900;letter-spacing:.1em}.ide-save-state{font-size:10px;letter-spacing:0;color:#8192ad;font-weight:500}.ide-editor-mount{height:100%;min-height:510px;position:relative;background:#0b1220}.ide-textarea{display:none;width:100%;height:100%;min-height:510px;resize:vertical;border:0!important;border-radius:0!important;outline:0!important;padding:22px;background:#0b1220;color:#d9e5f8;font:14px/1.65 'SFMono-Regular',Consolas,monospace;tab-size:2}.CodeMirror{height:100%!important;min-height:510px;font:13px/1.7 'SFMono-Regular',Consolas,monospace;background:#0b1220!important;color:#d9e5f8!important;padding:12px 0}.CodeMirror-gutters{background:#0b1220!important;border-right:1px solid #1d2a40!important}.CodeMirror-linenumber{color:#60728e!important}.ide-preview{width:100%;height:360px;border:0;background:#fff;flex:1}.ide-console-panel{height:210px;min-height:160px;background:#090f1b;border-top:1px solid #26334b;display:flex;flex-direction:column}.ide-console-head{padding:11px 15px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e2b40;color:#dce7fa}.ide-console-head b{font-size:12px}.ide-console-head small{display:block;color:#73839e;font-size:10px;margin-top:2px}.ide-clear-console{background:transparent;color:#8fa1bd;border:1px solid #2a3850;padding:6px 10px;font-size:10px}.ide-console-body{overflow:auto;padding:8px 14px;font:12px/1.6 'SFMono-Regular',Consolas,monospace;color:#b9c9df}.ide-log{display:flex;gap:10px;padding:4px 0;border-bottom:1px solid #ffffff0a;overflow-wrap:anywhere}.ide-log-type{width:54px;flex:0 0 54px;font-size:9px;font-weight:900;color:#8aa1c4}.ide-log.error .ide-log-type{color:#ff788e}.ide-log.warn .ide-log-type{color:#f6c66a}.ide-log.success .ide-log-type{color:#55d6ad}.ide-footer{display:flex;justify-content:space-between;gap:12px;padding:12px 5px;color:var(--mut);font-size:11px}.ide-footer span:first-child{color:#2abf9c}
-@media(max-width:900px){.community-layout{grid-template-columns:1fr}.community-sidebar{grid-template-columns:1fr 1fr}.ide-workspace{grid-template-columns:1fr}.ide-editor-panel{border-right:0;border-bottom:1px solid #26334b}.ide-editor-mount,.ide-textarea,.CodeMirror{min-height:380px}.ide-preview{min-height:330px}}
-@media(max-width:600px){header{padding:10px 13px}.brand-mark{width:40px;height:40px}.logo{font-size:20px}nav{padding:5px 0}nav button{white-space:nowrap}.community-hero{padding:26px 21px;border-radius:22px}.community-hero h1{font-size:32px}.community-composer,.community-feed-panel,.community-side-card{padding:16px}.community-sidebar{grid-template-columns:1fr}.community-post-v2{padding:14px;gap:10px}.community-post-meta{align-items:flex-start;flex-direction:column;gap:3px}.community-compose-foot{align-items:flex-start}.community-compose-actions{width:100%;justify-content:space-between}.community-send{flex:1}.ide-heading{align-items:flex-start}.ide-heading-mark{width:58px;height:58px;flex-basis:58px;border-radius:18px;font-size:22px}.ide-heading h1{font-size:31px}.ide-toolbar{align-items:flex-start}.ide-actions{width:100%}.ide-actions button{flex:1}.ide-editor-mount,.ide-textarea,.CodeMirror{min-height:330px}.ide-preview{min-height:290px}.ide-footer{flex-direction:column}}
-/* ===== END PREMIUM PLATFORM REDESIGN ===== */
-
+.learning-stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}.learning-stat-grid>div{padding:16px;border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;gap:5px}.learning-stat-grid strong{font-size:25px}.learning-stat-grid small,.community-post small{color:var(--muted)}.community-feed{display:grid;gap:12px;margin-top:20px}.community-post{border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:12px}.community-post-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.community-post p{white-space:pre-wrap;overflow-wrap:anywhere}.leaderboard-row{display:flex;justify-content:space-between;align-items:center}.roadmap-lesson{padding:7px 10px;border-top:1px solid var(--line);font-size:14px}.code-editor{width:100%;min-height:130px;font:13px/1.5 ui-monospace,monospace;margin:8px 0 16px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text)}.playground-editors{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.playground-pane{min-width:0}.playground-pane .code-editor{height:300px;resize:vertical}.playground-actions{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.playground-console{white-space:pre-wrap;overflow:auto;max-height:220px;padding:14px;border-radius:12px;background:#101827;color:#d8e4ff;min-height:70px}.code-preview{width:100%;height:360px;border:1px solid var(--line);border-radius:12px;background:#fff;margin-top:12px}@media(max-width:800px){.playground-editors{grid-template-columns:1fr}.playground-pane .code-editor{height:220px}}@media(max-width:600px){.learning-stat-grid{grid-template-columns:1fr 1fr}}
 </style>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
 </head>
 <body>
 <header>
@@ -424,9 +403,9 @@ function setNav() {
     nav.append(
       el('button', { className: 'icon-btn', title: 'Sevimlilar', 'aria-label': 'Sevimlilar', innerHTML: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 8.8c0 5.2-8.8 10.2-8.8 10.2S3.2 14 3.2 8.8A4.8 4.8 0 0 1 12 6.2a4.8 4.8 0 0 1 8.8 2.6Z"/></svg>', onclick: () => { filt.fav = true; showList(); } }),
       bell,
-      el('button', { title: 'Hamjamiyat', textContent: 'Hamjamiyat', onclick: () => showCommunity() }),
-      el('button', { title: 'Reyting', textContent: 'Reyting', onclick: () => showLeaderboard() }),
-      el('button', { title: 'Yo‘l xaritasi', textContent: 'Yo‘l xaritasi', onclick: () => showRoadmap() }),
+      el('button', { title: 'Hamjamiyat', innerHTML: iconLabel('users','Hamjamiyat'), onclick: () => showCommunity() }),
+      el('button', { title: 'Reyting', innerHTML: iconLabel('trophy','Reyting'), onclick: () => showLeaderboard() }),
+      el('button', { title: 'Yo‘l xaritasi', innerHTML: iconLabel('map','Xarita'), onclick: () => showRoadmap() }),
       el('button', { title: 'Kod muhiti', textContent: 'Kod yozish', onclick: () => showPlayground() }),
       el('button', { className: 'icon-btn', title: 'Profilim', 'aria-label': 'Profilim', innerHTML: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.5 3.1-5.3 7-5.3s6.3 1.8 7 5.3"/></svg>', onclick: () => showProfile() }),
       el('button', { className: me.pro ? 'pri pro-pill' : 'pro-pill', innerHTML: me.pro ? iconLabel('crown','PRO') : iconLabel('gem','Pro'), onclick: () => showPlans() })
@@ -510,6 +489,7 @@ function showAuth(mode) {
     }catch(e){err.textContent=e.message;}
   }});
   form.append(submitButton);
+  if(!reg){ const forgot=el('button',{type:'button',className:'text-link',textContent:'Parolni unutdingizmi?',onclick:()=>openRecovery(form,closeBtn)}); form.append(forgot); }
   u.onkeydown=e=>{if(e.key==='Enter')p.focus()};p.onkeydown=e=>{if(e.key==='Enter')submitButton.click()};
   const ov=el('div',{id:'ov',className:'overlay',onclick:e=>{if(e.target===ov)closeAuth()}},el('div',{className:'auth'},el('div',{className:'auth-art'},el('img',{className:'auth-brand-mark',src:'/logo-mark.png',alt:'Dasturlash Kursi logotipi'}),el('div',{className:'logo'},'Dasturlash ',el('b',{textContent:'Kursi'})),el('p',{textContent:"Dasturlashni dars-ma-dars o'rganing. Kiring va yangi darslarni ko'ring."}),el('div',{className:'credit'},'Created by ',el('b',{textContent:'Sobirov'}))),form));
   document.body.append(ov);document.body.style.overflow='hidden';u.focus();
@@ -523,7 +503,7 @@ async function showProfile() {
   const badgeItems=[['none','<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.5 3.1-5.3 7-5.3s6.3 1.8 7 5.3"/></svg>','Oddiy'],['crown',iconSvg('crown'),'Toj'],['star','✦','Yulduz'],['fire','♨','Olov'],['diamond','◆','Olmos'],['code','</>','Kod']];
   const drawBadges=()=>badge.replaceChildren(...badgeItems.map(([v,ico,label])=>el('button',{type:'button',className:'badge-choice'+(selectedBadge===v?' selected':''),disabled:!me.pro&&v!=='none',title:label,innerHTML:'<span class="badge-orb">'+ico+'</span><small>'+label+'</small>',onclick:()=>{selectedBadge=v;drawBadges();}})));drawBadges();
   const status=el('div',{className:'sub'});
-  const save=el('button',{className:'pri',textContent:'Profilni saqlash',onclick:async()=>{try{await api('/api/profile','PUT',{profileName:name.value,badge:selectedBadge});me=await api('/api/me');status.textContent='Profil saqlandi.';showProfile();setNav();}catch(e){status.textContent=e.message;}}});
+  const save=el('button',{className:'pri',textContent:'Profilni saqlash',onclick:async()=>{try{const changed=String(name.value||'').trim()!==String(me.profileName||'').trim();let currentPassword='';if(changed&&me.profileName){currentPassword=prompt('Ismni tahrirlash uchun akkaunt parolingizni kiriting:')||'';if(!currentPassword)return;}await api('/api/profile','PUT',{profileName:name.value,badge:selectedBadge,currentPassword});me=await api('/api/me');status.textContent='Profil saqlandi.';showProfile();setNav();}catch(e){status.textContent=e.message;}}});
   const proUntil=me.pro&&me.proUntil?new Date(me.proUntil).toLocaleDateString():'Faol emas';
   const avatarBadge=badgeItems.find(x=>x[0]===(me.badge||'none'))||badgeItems[0];
   const head=el('section',{className:'profile-card profile-head'},el('div',{className:'profile-symbol',innerHTML:avatarBadge[0]==='none'?'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.5 3.1-5.3 7-5.3s6.3 1.8 7 5.3"/></svg>':avatarBadge[1]}),el('div',{},el('h2',{textContent:me.profileName||me.username}),el('p',{className:'sub',textContent:'@'+me.username}),el('span',{className:me.pro?'profile-pro':'profile-free',textContent:me.pro?'PRO OBUNA':'ODDIY FOYDALANUVCHI'})));
@@ -554,134 +534,42 @@ async function showLeaderboard(){
   rows.forEach(r=>box.append(el('div',{className:'community-post leaderboard-row'},el('b',{textContent:'#'+r.rank+'  '+r.name}),el('span',{textContent:r.xp+' XP'}))));$('#app').replaceChildren(box);}catch(e){alert(e.message);}
 }
 async function showCommunity(){
-  if(window.__communityTimer) clearInterval(window.__communityTimer);
-  const shell=el('section',{className:'community-shell'});
-  const hero=el('div',{className:'community-hero'},
-    el('div',{className:'community-kicker',textContent:'DASTURLASH KURSI · COMMUNITY'}),
-    el('h1',{textContent:'Birga o‘rganamiz. Birga rivojlanamiz.'}),
-    el('p',{textContent:'Savollaringizni bering, yechimlarni ulashing va boshqa dasturchilar bilan tajriba almashing.'}));
-  const layout=el('div',{className:'community-layout'});
-  const composer=el('section',{className:'community-composer'});
-  const avatar=el('div',{className:'community-avatar community-avatar-me',textContent:(me.profileName||me.username||'U').trim().slice(0,1).toUpperCase()});
-  const input=el('textarea',{className:'community-input',placeholder:'Nima haqida fikr almashmoqchisiz? Savolingizni batafsil yozing...',maxLength:1200,rows:4});
-  const count=el('span',{className:'community-count',textContent:'0 / 1200'});
-  const status=el('span',{className:'community-status',textContent:'Hamjamiyatga xush kelibsiz'});
-  const send=el('button',{className:'community-send',innerHTML:'<span>➤</span> Xabarni joylash',onclick:async()=>{
-    const value=input.value.trim(); if(!value){status.textContent='Avval xabar matnini kiriting.';input.focus();return;}
-    send.disabled=true;send.textContent='Yuborilmoqda…';
-    try{await api('/api/community','POST',{text:value});input.value='';count.textContent='0 / 1200';status.textContent='Xabaringiz muvaffaqiyatli joylandi.';await refresh();}
-    catch(e){status.textContent=e.message;}
-    finally{send.disabled=false;send.innerHTML='<span>➤</span> Xabarni joylash';}
-  }});
-  input.addEventListener('input',()=>count.textContent=input.value.length+' / 1200');
-  composer.append(el('div',{className:'community-composer-top'},avatar,el('div',{},el('b',{textContent:me.profileName||me.username}),el('small',{textContent:'Hamjamiyatga yangi post yozish'}))),input,el('div',{className:'community-compose-foot'},status,el('div',{className:'community-compose-actions'},count,send)));
-  const feedPanel=el('section',{className:'community-feed-panel'});
-  const feedHead=el('div',{className:'community-feed-head'},el('div',{},el('h2',{textContent:'Muhokamalar'}),el('p',{textContent:'O‘quvchilar tomonidan ulashilgan so‘nggi xabarlar'})));
-  const search=el('input',{className:'community-search',placeholder:'Xabarlardan qidirish…',type:'search'});
-  const feed=el('div',{className:'community-feed'});
-  let allRows=[];
-  const render=()=>{
-    const q=search.value.trim().toLocaleLowerCase();const rows=allRows.filter(p=>(p.text||'').toLocaleLowerCase().includes(q)||(p.name||p.username||'').toLocaleLowerCase().includes(q));
-    feed.replaceChildren();
-    if(!rows.length){feed.append(el('div',{className:'community-empty'},el('div',{className:'community-empty-icon',textContent:'✦'}),el('h3',{textContent:q?'Mos xabar topilmadi':'Hali muhokama boshlanmagan'}),el('p',{textContent:q?'Boshqa so‘z bilan qidirib ko‘ring.':'Birinchi bo‘lib savol yoki fikringizni ulashing.'})));return;}
-    rows.forEach(p=>{
-      const name=p.name||p.username||'Foydalanuvchi';const initial=name.trim().slice(0,1).toUpperCase();
-      const own=p.userId===me.id||me.owner||me.role==='admin';
-      const date=new Date(p.created);const when=isNaN(date)?'':date.toLocaleDateString('uz-UZ',{day:'2-digit',month:'short',year:'numeric'})+' · '+date.toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'});
-      const post=el('article',{className:'community-post-v2'},
-        el('div',{className:'community-post-avatar',textContent:initial}),
-        el('div',{className:'community-post-content'},
-          el('div',{className:'community-post-meta'},el('div',{},el('b',{textContent:name}),el('small',{textContent:'O‘quvchi'})),el('time',{textContent:when})),
-          el('p',{className:'community-post-text',textContent:p.text||''}),
-          el('div',{className:'community-post-actions'},el('span',{className:'community-post-tag',textContent:'💬 Muhokama'}),own?el('button',{className:'community-delete',textContent:'O‘chirish',onclick:async()=>{if(!confirm('Ushbu xabar o‘chirilsinmi?'))return;try{await api('/api/community/'+p.id,'DELETE');await refresh();}catch(e){status.textContent=e.message;}}}):el('span'))
-        ));feed.append(post);
-    });
-  };
-  const refresh=async()=>{try{allRows=await api('/api/community');render();}catch(e){status.textContent=e.message;}};
-  search.addEventListener('input',render);
-  feedHead.append(search);feedPanel.append(feedHead,feed);
-  const side=el('aside',{className:'community-sidebar'},
-    el('div',{className:'community-side-card'},el('span',{className:'community-side-icon',textContent:'✦'}),el('h3',{textContent:'Yaxshi hamjamiyat qoidalari'}),el('ul',{},el('li',{textContent:'Savolni aniq va tushunarli yozing'}),el('li',{textContent:'Boshqalarga hurmat bilan munosabatda bo‘ling'}),el('li',{textContent:'Yechim va foydali manbalarni ulashing'}))),
-    el('div',{className:'community-side-card community-side-accent'},el('small',{textContent:'SIZNING MAQSADINGIZ'}),el('h3',{textContent:'Har kuni oz bo‘lsa ham kod yozing.'}),el('p',{textContent:'Bilim ulashilgan sari kuchayadi.'})));
-  layout.append(el('div',{className:'community-main-column'},composer,feedPanel),side);
-  shell.append(hero,layout);$('#app').replaceChildren(shell);await refresh();
-  window.__communityTimer=setInterval(()=>{if(document.body.contains(shell))refresh();else clearInterval(window.__communityTimer);},15000);
+  const box=el('section',{className:'profile-card'});const input=el('textarea',{placeholder:'Savolingiz yoki fikringizni yozing...',maxLength:1200});const status=el('p',{className:'sub'});const feed=el('div',{className:'community-feed'});
+  const refresh=async()=>{try{const rows=await api('/api/community');feed.replaceChildren(...(rows.length?rows.map(p=>el('article',{className:'community-post'},el('div',{className:'community-post-head'},el('b',{textContent:p.name||p.username}),el('small',{textContent:new Date(p.created).toLocaleString()})),el('p',{textContent:p.text}),((p.userId===me.id||me.owner||me.role==='admin')?el('button',{textContent:'O‘chirish',onclick:async()=>{await api('/api/community/'+p.id,'DELETE');refresh();}}):el('span')))):[el('p',{className:'sub',textContent:'Hozircha xabarlar yo‘q. Birinchi bo‘lib yozing!'})]));}catch(e){status.textContent=e.message;}};
+  const send=el('button',{className:'pri',textContent:'Xabar yuborish',onclick:async()=>{try{await api('/api/community','POST',{text:input.value});input.value='';status.textContent='Xabaringiz joylandi.';refresh();}catch(e){status.textContent=e.message;}}});box.append(el('h2',{textContent:'O‘quvchilar hamjamiyati'}),el('p',{className:'sub',textContent:'Savol bering, tajriba almashing va boshqalarga yordam bering.'}),input,send,status,feed);$('#app').replaceChildren(box);refresh();
 }
 async function showRoadmap(){
   try{const rows=await api('/api/roadmap');const box=el('section',{className:'profile-card'});box.append(el('h2',{textContent:'O‘quv yo‘l xaritasi'}),el('p',{className:'sub',textContent:'Kurslarni ketma-ket o‘rganing. Ko‘rilgan darslar bajarilgan deb belgilanadi.'}));
   rows.forEach(c=>{const done=c.lessons.filter(x=>x.done).length;const card=el('article',{className:'community-post'},el('h3',{textContent:c.order+'. '+c.title}),el('p',{className:'sub',textContent:c.genre+' · '+done+'/'+c.lessons.length+' dars bajarilgan'}));c.lessons.forEach((l,i)=>card.append(el('div',{className:'roadmap-lesson',textContent:(l.done?'✓ ':'○ ')+(i+1)+'. '+l.title})));card.append(el('button',{className:'pri',textContent:'Kursni ochish',onclick:()=>showDetail(c.id)}));box.append(card);});if(!rows.length)box.append(el('p',{className:'sub',textContent:'Hozircha yo‘l xaritasiga kurslar qo‘shilmagan.'}));$('#app').replaceChildren(box);}catch(e){alert(e.message);}
 }
 function showPlayground(){
-  const shell=el('section',{className:'ide-shell'});
-  const top=el('div',{className:'ide-heading'},el('div',{},el('div',{className:'ide-kicker',textContent:'DASTURLASH KURSI · ONLINE IDE'}),el('h1',{textContent:'G‘oyangizni kodga aylantiring.'}),el('p',{textContent:'HTML, CSS va JavaScript yozing, ishga tushiring va natijani real vaqtda ko‘ring.'})),el('div',{className:'ide-heading-mark',textContent:'</>'}));
-  const toolbar=el('div',{className:'ide-toolbar'});
-  const tabs=el('div',{className:'ide-tabs'});const actions=el('div',{className:'ide-actions'});
-  const runBtn=el('button',{className:'ide-run',innerHTML:'▶ Ishga tushirish'});
-  const resetBtn=el('button',{className:'ide-quiet',textContent:'↺ Namunani tiklash'});
-  const clearBtn=el('button',{className:'ide-quiet',textContent:'⌫ Tozalash'});
-  actions.append(resetBtn,clearBtn,runBtn);toolbar.append(tabs,actions);
-  const starter={
-    html:`<!doctype html>
-<html lang="uz">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mening birinchi sahifam</title>
-</head>
-<body>
-  <main class="card">
-    <span class="tag">MENING BIRINCHI LOYIHAM</span>
-    <h1>Salom, dunyo! 👋</h1>
-    <p>Men HTML, CSS va JavaScript o‘rganyapman.</p>
-    <button id="hello">Meni bos</button>
-  </main>
-</body>
-</html>`,
-    css:`* { box-sizing: border-box; }
-body { margin:0; min-height:100vh; display:grid; place-items:center; font-family:Inter,Arial,sans-serif; background:linear-gradient(135deg,#eef2ff,#dff7f4); color:#17233d; }
-.card { background:white; padding:42px; border-radius:24px; box-shadow:0 20px 60px #26365a22; text-align:center; max-width:520px; }
-.tag { color:#6258df; font-size:11px; font-weight:800; letter-spacing:2px; }
-h1 { font-size:38px; margin:18px 0 8px; }
-p { color:#66748a; }
-button { border:0; border-radius:12px; padding:13px 22px; background:#6258df; color:white; font-weight:700; cursor:pointer; }`,
-    js:`document.querySelector('#hello')?.addEventListener('click', () => {
-  console.log('Ajoyib! Tugma ishladi.');
-  alert('Barakalla! JavaScript ishlayapti 🎉');
-});
-console.log('Loyiha muvaffaqiyatli ishga tushdi.');`
+  const box=el('section',{className:'profile-card playground'});
+  const html=el('textarea',{className:'code-editor',spellcheck:false, value:'<!doctype html>\n<html>\n<head><meta charset=\"utf-8\"></head>\n<body>\n  <h1>Salom, dunyo!</h1>\n  <p>Men kod yozishni o‘rganyapman.</p>\n</body>\n</html>'});
+  const css=el('textarea',{className:'code-editor',spellcheck:false,value:'body { font-family: Arial; padding: 24px; } h1 { color: royalblue; }'});
+  const js=el('textarea',{className:'code-editor',spellcheck:false,value:"console.log('Salom!');"});
+  const frame=el('iframe',{className:'code-preview',title:'Kod natijasi'});frame.setAttribute('sandbox','allow-scripts allow-forms allow-modals');
+  const status=el('p',{className:'sub',textContent:'Kodlar brauzer ichida ishga tushadi. Serverga yuborilmaydi.'});
+  const consoleBox=el('pre',{className:'playground-console',textContent:'Konsol tayyor.'});
+  const run=()=>{
+    const h=html.value; const style=css.value.replace(/<\/style/gi,'<\\/style'); const script=js.value.replace(/<\/script/gi,'<\\/script');
+    const base=h.match(/<head[^>]*>/i)?h.replace(/<head[^>]*>/i,m=>m+'<style>'+style+'</style>'):'<head><meta charset="utf-8"><style>'+style+'</style></head>'+h;
+    const bridge='<script>(function(){const send=(type,args)=>parent.postMessage({__dkPlayground:true,type,args:Array.from(args).map(x=>{try{return typeof x==="string"?x:JSON.stringify(x)}catch(e){return String(x)}})},"*");["log","info","warn","error"].forEach(k=>{const old=console[k];console[k]=function(){send(k,arguments);old.apply(console,arguments)}});window.onerror=function(m,s,l,c){send("error",[m+" ("+l+":"+c+")"])};})();<\/script>';
+    const injected=bridge+'<script>'+script+'<\/script>';
+    let source=base;
+    if(/<\/body>/i.test(source))source=source.replace(/<\/body>/i,injected+'</body>');else source+=''+injected;
+    consoleBox.textContent='Ishga tushirildi. Konsol xabarlari shu yerda ko‘rinadi.'; frame.srcdoc=source; status.textContent='Natija yangilandi.';
   };
-  const editors={};let active='html';let cmReady=false;let cmInstances={};
-  const workspace=el('div',{className:'ide-workspace'});const editorPanel=el('section',{className:'ide-editor-panel'});const editorTop=el('div',{className:'ide-panel-title'},el('span',{textContent:'✧  KOD MUHARRIRI'}),el('span',{className:'ide-save-state',textContent:'Brauzerda ishlaydi · Serverga yuborilmaydi'}));
-  const editorMount=el('div',{className:'ide-editor-mount'});
-  ['html','css','js'].forEach((key)=>{const ta=el('textarea',{className:'ide-textarea',spellcheck:false, value:starter[key], 'aria-label':key.toUpperCase()});editors[key]=ta;});
-  const switchTab=(key)=>{active=key;tabs.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.tab===key));Object.keys(editors).forEach(k=>{editors[k].style.display=k===key?'block':'none';if(cmInstances[k])cmInstances[k].getWrapperElement().style.display=k===key?'block':'none';});if(cmInstances[key])setTimeout(()=>cmInstances[key].refresh(),30);};
-  ['html','css','js'].forEach((key)=>{const b=el('button',{className:'ide-tab',textContent:key==='js'?'JS':key.toUpperCase(),onclick:()=>switchTab(key)});b.dataset.tab=key;tabs.append(b);editorMount.append(editors[key]);});
-  editorPanel.append(editorTop,editorMount);
-  const previewPanel=el('section',{className:'ide-preview-panel'});const previewHead=el('div',{className:'ide-panel-title'},el('span',{textContent:'◉  NATIJA'}),el('span',{className:'ide-preview-status',textContent:'LIVE PREVIEW'}));
-  const frame=el('iframe',{className:'ide-preview',title:'Kod natijasi'});frame.setAttribute('sandbox','allow-scripts allow-modals');
-  const consolePanel=el('section',{className:'ide-console-panel'});const consoleHead=el('div',{className:'ide-console-head'},el('div',{},el('b',{textContent:'Terminal / Console'}),el('small',{textContent:'JavaScript xabarlari va xatolar'})),el('button',{className:'ide-clear-console',textContent:'Tozalash'}));const consoleBody=el('div',{className:'ide-console-body'});consolePanel.append(consoleHead,consoleBody);
-  previewPanel.append(previewHead,frame,consolePanel);workspace.append(editorPanel,previewPanel);
-  const footer=el('div',{className:'ide-footer'},el('span',{textContent:'● Xavfsiz sandbox muhiti'}),el('span',{textContent:'Ctrl + Enter  ·  Ishga tushirish'}));
-  shell.append(top,toolbar,workspace,footer);$('#app').replaceChildren(shell);
-  function value(key){return cmInstances[key]?cmInstances[key].getValue():editors[key].value;}
-  function log(type,args){const line=el('div',{className:'ide-log '+type});line.append(el('span',{className:'ide-log-type',textContent:type.toUpperCase()}),el('span',{textContent:args.map(x=>{try{return typeof x==='string'?x:JSON.stringify(x);}catch{return String(x);}}).join(' ')}));consoleBody.append(line);consoleBody.scrollTop=consoleBody.scrollHeight;}
-  function run(){consoleBody.replaceChildren();log('info',['Ishga tushirilmoqda…']);const raw=value('html');let source=raw;
-    if(/<\/head>/i.test(source))source=source.replace(/<\/head>/i,'<style>'+value('css')+'</style></head>');else source='<style>'+value('css')+'</style>'+source;
-    const bridge=`<script>(function(){const send=(type,args)=>parent.postMessage({__ideConsole:true,type,args},'*');['log','info','warn','error','debug'].forEach(k=>{const old=console[k];console[k]=(...a)=>{send(k,a.map(x=>{try{return typeof x==='string'?x:JSON.stringify(x)}catch(e){return String(x)}}));old.apply(console,a)}});window.addEventListener('error',e=>send('error',[e.message+' ('+e.lineno+':'+e.colno+')']));})();<\/script>`;
-    const script='<script>'+value('js').replace(/<\/script/gi,'<\\/script')+'<\/script>';
-    source=source.replace(/<\/body>/i,bridge+script+'</body>');if(!/<\/body>/i.test(source))source+=bridge+script;
-    frame.srcdoc=source;log('success',['Preview yangilandi.']);
-  }
-  window.removeEventListener('message',window.__ideMessageHandler||(()=>{}));window.__ideMessageHandler=(event)=>{if(event.source!==frame.contentWindow||!event.data||!event.data.__ideConsole)return;log(event.data.type,event.data.args||[]);};window.addEventListener('message',window.__ideMessageHandler);
-  runBtn.onclick=run;resetBtn.onclick=()=>{Object.keys(editors).forEach(k=>{if(cmInstances[k])cmInstances[k].setValue(starter[k]);else editors[k].value=starter[k];});run();};clearBtn.onclick=()=>{Object.keys(editors).forEach(k=>{if(cmInstances[k])cmInstances[k].setValue('');else editors[k].value='';});run();};consoleHead.querySelector('button').onclick=()=>consoleBody.replaceChildren();
-  shell.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();run();}});
-  switchTab('html');run();
-  const load=(url)=>new Promise((resolve,reject)=>{const elx=document.createElement('script');elx.src=url;elx.onload=resolve;elx.onerror=reject;document.head.append(elx);});
-  (async()=>{await load('https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js');await load('https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js');await load('https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js');await load('https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js');
-    if(!document.body.contains(shell))return;cmReady=true;
-    Object.keys(editors).forEach(k=>{const mode=k==='html'?'xml':k==='css'?'css':'javascript';const cm=window.CodeMirror.fromTextArea(editors[k],{mode,lineNumbers:true,theme:'material-darker',indentUnit:2,tabSize:2,lineWrapping:false,matchBrackets:true,autoCloseBrackets:true});cm.setSize('100%','100%');cmInstances[k]=cm;});switchTab(active);
-  })().catch(()=>{editorTop.querySelector('.ide-save-state').textContent='Oddiy muharrir rejimi · Kutubxona yuklanmadi';});
+  const runBtn=el('button',{className:'pri',textContent:'▶ Ishga tushirish',onclick:run});
+  const reset=el('button',{textContent:'Qayta tiklash',onclick:()=>{html.value='<!doctype html>\n<html>\n<head><meta charset="utf-8"></head>\n<body>\n  <h1>Salom, dunyo!</h1>\n  <p>Men kod yozishni o‘rganyapman.</p>\n</body>\n</html>';css.value='body { font-family: Arial; padding: 24px; } h1 { color: royalblue; }';js.value="console.log('Salom!');";run();}});
+  const clear=el('button',{textContent:'Konsolni tozalash',onclick:()=>consoleBox.textContent='Konsol tozalandi.'});
+  const editors=el('div',{className:'playground-editors'},...[["HTML",html],["CSS",css],["JavaScript",js]].map(([label,area])=>el('div',{className:'playground-pane'},el('label',{textContent:label}),area)));
+  box.append(el('h2',{textContent:'Onlayn kod muhiti'}),el('p',{className:'sub',textContent:'HTML, CSS va JavaScript kodlarini yozing, ishga tushiring va natijani ko‘ring.'}),editors,el('div',{className:'playground-actions'},runBtn,reset,clear),status,el('h3',{textContent:'Natija'}),frame,el('h3',{textContent:'Konsol'}),consoleBox);
+  window.removeEventListener('message',window.__dkPlaygroundListener||(()=>{}));window.__dkPlaygroundListener=e=>{if(e.source!==frame.contentWindow||!e.data||!e.data.__dkPlayground)return;const line='['+e.data.type.toUpperCase()+'] '+(e.data.args||[]).join(' ');consoleBox.textContent=(consoleBox.textContent+'\n'+line).slice(-12000);};window.addEventListener('message',window.__dkPlaygroundListener);
+  $('#app').replaceChildren(box);run();
 }
+
+function openRecovery(form,closeBtn){
+  const nonceState={value:''};const msg=el('p',{className:'sub',textContent:'Telegram bot orqali akkauntingizni tasdiqlang.'});const start=el('button',{className:'pri go',textContent:'Telegram orqali tiklash kodini olish',onclick:async()=>{try{const d=await api('/api/recovery/start','POST',{});nonceState.value=d.nonce;const bot=el('button',{className:'pri',innerHTML:iconLabel('bot','Telegram botni ochish'),onclick:()=>window.open(d.botUrl,'_blank','noopener')});const code=el('input',{inputMode:'numeric',maxLength:6,placeholder:'6 xonali kod'});const verify=el('button',{className:'pri',textContent:'Kodni tasdiqlash',onclick:async()=>{try{const v=await api('/api/recovery/verify','POST',{nonce:nonceState.value,code:code.value});const newLogin=el('input',{placeholder:'Yangi login (ixtiyoriy)',maxLength:20});const newPass=el('input',{type:'password',placeholder:'Yangi parol (ixtiyoriy)'});const save=el('button',{className:'pri',textContent:'Akkauntni tiklash',onclick:async()=>{try{const done=await api('/api/recovery/complete','POST',{recoveryToken:v.recoveryToken,username:newLogin.value.trim(),password:newPass.value});token=done.token;localStorage.setItem('token',token);me=await api('/api/me');closeAuth();setNav();showList();}catch(e){msg.textContent=e.message;}}});form.replaceChildren(closeBtn,el('h2',{textContent:'Yangi login va parol'}),msg,el('label',{textContent:'Yangi login'}),newLogin,el('label',{textContent:'Yangi parol'}),newPass,save);}catch(e){msg.textContent=e.message;}}});form.replaceChildren(closeBtn,el('h2',{textContent:'Akkauntni tiklash'}),msg,bot,el('label',{textContent:'Telegram kodini kiriting'}),code,verify);}catch(e){msg.textContent=e.message;}}});form.replaceChildren(closeBtn,el('h2',{textContent:'Parol yoki loginni unutdingizmi?'}),msg,start);}
 
 function openAccountChange(){
   const overlay=el('div',{className:'overlay account-overlay'});const panel=el('div',{className:'account-modal'});const close=el('button',{className:'x',textContent:'×',onclick:()=>overlay.remove()});
@@ -752,7 +640,7 @@ async function takeTest(id){
           let current=await api('/api/me');
           if(!current.profileName){const entered=prompt('Sertifikatda ko‘rinishi uchun ism-familiyangizni kiriting:');if(entered&&entered.trim().length>=2){await api('/api/profile','PUT',{profileName:entered.trim(),badge:current.badge||'none'});current=await api('/api/me');}}
           const certActions=el('div',{className:'test-result-actions'});
-          const editName=el('button',{textContent:'✏️ Ismni tahrirlash',disabled:!current.profileName||!!current.profileNameEditUsed,onclick:async()=>{const changed=prompt('Sertifikatda ko‘rinadigan yangi ism-familiyangizni kiriting:',current.profileName);if(!changed||changed.trim().length<2)return;try{await api('/api/profile','PUT',{profileName:changed.trim(),badge:current.badge||'none'});current=await api('/api/me');out.querySelector('.cert-owner').textContent='Sertifikat egasi: '+current.profileName;editName.disabled=true;editName.textContent='✓ Ism tahrirlandi';}catch(e){alert(e.message);}}});
+          const editName=el('button',{textContent:'✏️ Ismni tahrirlash',disabled:!current.profileName,onclick:async()=>{const changed=prompt('Sertifikatda ko‘rinadigan yangi ism-familiyangizni kiriting:',current.profileName);if(!changed||changed.trim().length<2)return;try{const currentPassword=prompt('Ismni tahrirlash uchun akkaunt parolingizni kiriting:')||'';if(!currentPassword)return;await api('/api/profile','PUT',{profileName:changed.trim(),badge:current.badge||'none',currentPassword});current=await api('/api/me');out.querySelector('.cert-owner').textContent='Sertifikat egasi: '+current.profileName;editName.disabled=true;editName.textContent='✓ Ism tahrirlandi';}catch(e){alert(e.message);}}});
           const getCert=el('button',{className:'pri',innerHTML:iconLabel('medal','Sertifikatni yuklab olish'),disabled:!current.profileName,onclick:async()=>{try{const cert=await api('/api/certificates','POST',{testId:id});printCertificate(cert);showProfile();}catch(e){alert(e.message);}}});
           if(current.profileName)out.append(el('p',{className:'cert-owner',textContent:'Sertifikat egasi: '+current.profileName}));else out.append(el('p',{className:'sub',textContent:'Sertifikat olish uchun profilingizda ism-familiya saqlashingiz kerak.'}));
           certActions.append(editName,getCert);out.append(certActions);

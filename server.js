@@ -6,6 +6,13 @@
 
 
 
+
+
+
+
+
+
+
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -22,7 +29,7 @@ const SECRET = process.env.JWT_SECRET ||
   crypto.createHash('sha256').update(MONGODB_URI + ADMIN_PASS).digest('hex');
 
 const app = express();
-let users, animes, comments, genres, reactions, notifs, promos, tariffs, pendingRegs, pendingRecoveries, tests, community;
+let users, animes, comments, genres, reactions, notifs, promos, tariffs, pendingRegs, pendingRecoveries, telegramLinks, tests, community;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_BOT_USERNAME = 'verification_zverbot';
 const ADMIN_TELEGRAM_ID = String(process.env.ADMIN_TELEGRAM_ID || '').trim();
@@ -86,9 +93,45 @@ app.post('/api/register/verify', wrap(async (req, res) => {
   if (!pending) return res.status(400).json({ error: 'Avval botdagi havolani ochib Start bosing. Kod 10 daqiqa amal qiladi.' });
   const digest = crypto.createHash('sha256').update(code).digest('hex');
   if (digest !== pending.codeHash) return res.status(400).json({ error: 'Tasdiqlash kodi noto‘g‘ri.' });
-  const user = { id: crypto.randomUUID(), username: pending.username, lower: pending.lower, hash: pending.hash, role: 'user', created: Date.now(), telegramChatId: pending.chatId, telegramUserId: pending.telegramUserId || pending.chatId, telegramUsername: pending.telegramUsername || null, telegramFirstName: pending.telegramFirstName || null };
-  try { await users.insertOne(user); }
-  catch (e) { if (e.code === 11000) return res.status(409).json({ error: 'Bu login band' }); throw e; }
+  // Oddiy foydalanuvchi uchun: bitta Telegram akkaunti faqat bitta sayt akkauntiga.
+  // Owner (ADMIN_USER) ushbu cheklovdan mustasno.
+  const telegramUserId = String(pending.telegramUserId || pending.chatId);
+  const telegramChatId = String(pending.chatId);
+  const isOwnerRegistration = pending.lower === ADMIN_USER.toLowerCase();
+
+  if (!isOwnerRegistration) {
+    const linkedAccount = await users.findOne({
+      lower: { $ne: ADMIN_USER.toLowerCase() },
+      $or: [{ telegramUserId }, { telegramChatId }]
+    }, { projection: { id: 1, username: 1 } });
+    if (linkedAccount) {
+      await pendingRegs.deleteOne({ nonce });
+      return res.status(409).json({
+        error: `Bu Telegram akkaunti allaqachon “${linkedAccount.username}” sayt akkauntiga ulangan. Yangi akkaunt ochish o‘rniga avvalgi akkauntingizga kiring yoki parolni tiklang.`
+      });
+    }
+  }
+
+  const user = { id: crypto.randomUUID(), username: pending.username, lower: pending.lower, hash: pending.hash, role: 'user', created: Date.now(), telegramChatId, telegramUserId, telegramUsername: pending.telegramUsername || null, telegramFirstName: pending.telegramFirstName || null };
+  // Owner uchun Telegram ID bo'yicha yagona claim qo'yilmaydi.
+  if (!isOwnerRegistration) {
+    try {
+      await telegramLinks.insertOne({ telegramUserId, userId: user.id, created: Date.now() });
+    } catch (e) {
+      if (e.code === 11000) {
+        await pendingRegs.deleteOne({ nonce });
+        return res.status(409).json({ error: 'Bu Telegram akkaunti bilan sayt akkaunti avval yaratilgan. Avvalgi akkauntingizga kiring yoki parolni tiklang.' });
+      }
+      throw e;
+    }
+  }
+  try {
+    await users.insertOne(user);
+  } catch (e) {
+    if (!isOwnerRegistration) await telegramLinks.deleteOne({ telegramUserId, userId: user.id });
+    if (e.code === 11000) return res.status(409).json({ error: 'Bu login band' });
+    throw e;
+  }
   await pendingRegs.deleteOne({ nonce });
   if (TELEGRAM_BOT_TOKEN && ADMIN_TELEGRAM_ID) {
     telegramSend(ADMIN_TELEGRAM_ID, `🆕 Yangi foydalanuvchi ro‘yxatdan o‘tdi\nLogin: ${user.username}\nJami foydalanuvchilar: ${await users.countDocuments({ role: 'user' })}`).catch(e => console.error('Admin xabari yuborilmadi:', e.message));
@@ -273,12 +316,13 @@ app.put('/api/profile', auth, wrap(async (req, res) => {
   const oldName = String(u.profileName || '').trim();
   const nameChanged = !!oldName && profileName !== oldName;
   if (oldName && !profileName) return res.status(400).json({ error: 'Ism-familiyani bo‘sh qoldirib bo‘lmaydi.' });
-  if (nameChanged && (u.certificates || []).length) return res.status(403).json({ error: 'Sertifikat berilgandan keyin ismni o‘zgartirib bo‘lmaydi.' });
-  if (nameChanged && u.profileNameEditUsed) return res.status(403).json({ error: 'Ismni tahrirlash imkoniyati bir marta ishlatilgan.' });
+  const isOwner = !!req.user.owner;
+  if (nameChanged && !isOwner && (u.certificates || []).length) return res.status(403).json({ error: 'Sertifikat berilgandan keyin ismni o‘zgartirib bo‘lmaydi.' });
+  if (nameChanged && !isOwner && u.profileNameEditUsed) return res.status(403).json({ error: 'Ismni tahrirlash imkoniyati bir marta ishlatilgan.' });
   if (nameChanged) { const currentPassword = String(req.body.currentPassword || ''); if (!currentPassword || !bcrypt.compareSync(currentPassword, u.hash)) return res.status(401).json({ error: 'Ismni tahrirlash uchun akkaunt parolingizni kiriting.' }); }
   const set = { badge };
   if (!oldName || profileName === oldName || nameChanged) set.profileName = profileName;
-  if (nameChanged) set.profileNameEditUsed = true;
+  if (nameChanged && !isOwner) set.profileNameEditUsed = true;
   await users.updateOne({ id: req.user.id }, { $set: set });
   res.json({ ok: true, profileName: set.profileName ?? oldName, badge, profileNameEditUsed: !!(u.profileNameEditUsed || nameChanged) });
 }));
@@ -919,6 +963,8 @@ async function pollTelegram() {
   tariffs = db.collection('tariffs');
   pendingRegs = db.collection('pendingRegs');
   pendingRecoveries = db.collection('pendingRecoveries');
+  telegramLinks = db.collection('telegramLinks');
+  await telegramLinks.createIndex({ telegramUserId: 1 }, { unique: true });
   await pendingRecoveries.createIndex({ nonce: 1 }, { unique: true });
   await pendingRecoveries.createIndex({ expires: 1 }, { expireAfterSeconds: 0 });
   tests = db.collection('tests');
@@ -967,6 +1013,8 @@ async function pollTelegram() {
 
 
 
+Контекстное окно заполнено
+Начните новый чат с автоматически созданной сводкой этого разговора или перейдите на платный план, чтобы продолжить здесь и увеличить объём доступного контекста в каждом чате.
 
 
 

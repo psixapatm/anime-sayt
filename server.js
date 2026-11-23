@@ -1,5 +1,13 @@
 
 
+Загрузка изображения анализа…
+
+
+
+
+
+
+
 
 
 
@@ -33,6 +41,7 @@ let botReplies, payments, botSettings, telegramAdmins, blockedUsers, adminLogs;
 
 app.use(express.json({ limit: '100kb' }));
 app.get('/logo-mark.png', (req, res) => res.sendFile(path.join(__dirname, 'logo-mark.png')));
+app.get('/certificate-signature.png', (req, res) => res.sendFile(path.join(__dirname, 'certificate-signature.png')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const wrap = (fn) => (req, res) => fn(req, res).catch(e => {
@@ -448,6 +457,12 @@ app.put('/api/admin/tests/:id', auth, mainAdminOnly, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 app.delete('/api/admin/tests/:id', auth, mainAdminOnly, wrap(async (req, res) => { await tests.deleteOne({ id: req.params.id }); res.json({ ok: true }); }));
+app.delete('/api/certificates/:id', auth, wrap(async (req, res) => {
+  const certificateId = String(req.params.id || '');
+  const result = await users.updateOne({ id: req.user.id }, { $pull: { certificates: { id: certificateId } } });
+  if (!result.modifiedCount) return res.status(404).json({ error: 'Sertifikat topilmadi yoki avval o‘chirilgan.' });
+  res.json({ ok: true });
+}));
 app.post('/api/certificates', auth, wrap(async (req, res) => {
   const testId = String(req.body.testId || '');
   const t = await tests.findOne({ id: testId, active: true });
@@ -1005,6 +1020,10 @@ async function pollTelegram() {
   );
   app.listen(process.env.PORT || 3000, () => { console.log('Sayt ishga tushdi'); if (TELEGRAM_BOT_TOKEN) { if (!ADMIN_TELEGRAM_ID) console.warn('ADMIN_TELEGRAM_ID kiritilmagan: admin xabarlari va anonim murojaatlar ishlamaydi.'); pollTelegram(); } else console.warn('TELEGRAM_BOT_TOKEN kiritilmagan: Telegram tasdiqlash o‘chiq.'); });
 })().catch(e => { console.error('Bazaga ulanib bo\'lmadi:', e.message); process.exit(1); });
+
+
+
+
 
 
 

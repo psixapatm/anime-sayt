@@ -1,6 +1,10 @@
 
 
 
+
+
+
+
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -17,7 +21,7 @@ const SECRET = process.env.JWT_SECRET ||
   crypto.createHash('sha256').update(MONGODB_URI + ADMIN_PASS).digest('hex');
 
 const app = express();
-let users, animes, comments, genres, reactions, notifs, promos, tariffs, pendingRegs, tests, community;
+let users, animes, comments, genres, reactions, notifs, promos, tariffs, pendingRegs, pendingRecoveries, tests, community;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_BOT_USERNAME = 'verification_zverbot';
 const ADMIN_TELEGRAM_ID = String(process.env.ADMIN_TELEGRAM_ID || '').trim();
@@ -31,6 +35,9 @@ const wrap = (fn) => (req, res) => fn(req, res).catch(e => {
   console.error(e); res.status(500).json({ error: 'Server xatosi' });
 });
 const sign = (u) => jwt.sign({ id: u.id, username: u.username, role: u.role }, SECRET, { expiresIn: '30d' });
+const badLoginWords = ['fuck','shit','bitch','asshole','сука','бляд','хуй','пизд','еба','ахмок','ахмоқ','каллакесар','хароми','haromi','iflos','ahmoq','axmoq','suka','blyad','xuy','pizd','ebla'];
+const isCleanLogin = (value) => { const v = String(value || '').toLowerCase().replace(/[_0-9]/g, ''); return !badLoginWords.some(w => v.includes(w)); };
+
 
 function auth(req, res, next) {
   const t = (req.headers.authorization || '').replace('Bearer ', '');
@@ -59,6 +66,7 @@ app.post('/api/register/start', wrap(async (req, res) => {
   const password = String(req.body.password || '');
   if (!/^[a-zA-Z0-9_]{3,20}$/.test(username))
     return res.status(400).json({ error: "Login 3-20 ta harf, raqam yoki _ bo'lishi kerak" });
+  if (!isCleanLogin(username)) return res.status(400).json({ error: 'Bu login odob-axloq qoidalariga mos emas. Boshqa login tanlang.' });
   if (password.length < 6) return res.status(400).json({ error: "Parol kamida 6 ta belgi bo'lishi kerak" });
   if (await users.findOne({ lower: username.toLowerCase() })) return res.status(409).json({ error: 'Bu login band' });
   const nonce = crypto.randomBytes(18).toString('hex');
@@ -263,7 +271,7 @@ app.put('/api/profile', auth, wrap(async (req, res) => {
   if (badge !== 'none' && (u.proUntil || 0) <= Date.now()) return res.status(403).json({ error: 'Profil bezaklari faqat faol Pro obunachilar uchun.' });
   const oldName = String(u.profileName || '').trim();
   const nameChanged = !!oldName && profileName !== oldName;
-  if (nameChanged && u.profileNameEditUsed) return res.status(403).json({ error: 'Ism-familiyangizni tahrirlash imkoniyati bir marta ishlatilgan.' });
+  if (nameChanged) { const currentPassword = String(req.body.currentPassword || ''); if (!currentPassword || !bcrypt.compareSync(currentPassword, u.hash)) return res.status(401).json({ error: 'Ismni tahrirlash uchun akkaunt parolingizni kiriting.' }); }
   const set = { badge };
   if (!oldName || profileName === oldName || nameChanged) set.profileName = profileName;
   if (nameChanged) set.profileNameEditUsed = true;
@@ -280,6 +288,7 @@ app.post('/api/account/change/start', auth, wrap(async (req, res) => {
   const password = String(req.body.password || '');
   if (!username && !password) return res.status(400).json({ error: 'Yangi login yoki yangi parol kiriting.' });
   if (username && !/^[a-zA-Z0-9_]{3,20}$/.test(username)) return res.status(400).json({ error: 'Login 3–20 ta harf, raqam yoki _ dan iborat bo‘lishi kerak.' });
+  if (username && !isCleanLogin(username)) return res.status(400).json({ error: 'Bu login odob-axloq qoidalariga mos emas. Boshqa login tanlang.' });
   if (password && password.length < 6) return res.status(400).json({ error: 'Yangi parol kamida 6 ta belgidan iborat bo‘lsin.' });
   if (username && username.toLowerCase() !== user.lower && await users.findOne({ lower: username.toLowerCase() })) return res.status(409).json({ error: 'Bu login band.' });
   if (user.pendingAccountChange?.created > Date.now() - 60 * 1000) return res.status(429).json({ error: 'Yangi kod so‘rashdan oldin 1 daqiqa kuting.' });
@@ -308,6 +317,41 @@ app.post('/api/account/change/verify', auth, wrap(async (req, res) => {
   if (pending.hash) set.hash = pending.hash;
   await users.updateOne({ id: user.id }, { $set: set, $unset: { pendingAccountChange: '' } });
   res.json({ ok: true, username: set.username || user.username, message: 'Akaunt ma’lumotlari muvaffaqiyatli yangilandi.' });
+}));
+
+// Akkauntni tiklash: Telegram orqali bog‘langan akkauntni aniqlash va 6 xonali kod.
+app.post('/api/recovery/start', wrap(async (req, res) => {
+  if (!TELEGRAM_BOT_TOKEN) return res.status(503).json({ error: 'Telegram bot hozircha sozlanmagan.' });
+  const nonce = crypto.randomBytes(18).toString('hex');
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  await pendingRecoveries.deleteMany({ expires: { $lte: Date.now() } });
+  await pendingRecoveries.insertOne({ nonce, codeHash: crypto.createHash('sha256').update(code).digest('hex'), codeForBot: code, chatId: null, created: Date.now(), expires: Date.now()+10*60*1000, attempts: 0 });
+  res.json({ ok: true, botUrl: `https://t.me/${TELEGRAM_BOT_USERNAME}?start=recover_${nonce}`, nonce });
+}));
+app.post('/api/recovery/verify', wrap(async (req, res) => {
+  const nonce=String(req.body.nonce||''); const code=String(req.body.code||'').trim();
+  if (!/^[a-f0-9]{36}$/.test(nonce) || !/^\d{6}$/.test(code)) return res.status(400).json({error:'Havola yoki 6 xonali kod noto‘g‘ri.'});
+  const pending=await pendingRecoveries.findOne({nonce,expires:{$gt:Date.now()},chatId:{$ne:null}});
+  if(!pending) return res.status(400).json({error:'Botda Start bosilmagan yoki kod muddati tugagan.'});
+  if(crypto.createHash('sha256').update(code).digest('hex')!==pending.codeHash){const n=(pending.attempts||0)+1;await pendingRecoveries.updateOne({nonce}, n>=5?{$set:{attempts:n},$unset:{codeForBot:''}}:{$set:{attempts:n}});return res.status(400).json({error:'Kod noto‘g‘ri yoki urinishlar tugadi.'});}
+  const linked=await users.find({$or:[{telegramChatId:String(pending.chatId)},{telegramUserId:String(pending.telegramUserId||'')}] }).toArray();
+  const eligible=linked.filter(u=>u.role!=='admin');
+  if(eligible.length!==1) return res.status(400).json({error:eligible.length?'Bu Telegramga bir nechta akkaunt ulangan. Admin bilan bog‘laning.':'Bu Telegramga ulangan sayt akkaunti topilmadi.'});
+  await pendingRecoveries.deleteOne({nonce});
+  res.json({ok:true,recoveryToken:jwt.sign({id:eligible[0].id,purpose:'account-recovery'},SECRET,{expiresIn:'10m'}),username:eligible[0].username});
+}));
+app.post('/api/recovery/complete', wrap(async(req,res)=>{
+  let payload;try{payload=jwt.verify(String(req.body.recoveryToken||''),SECRET);}catch{return res.status(401).json({error:'Tiklash sessiyasi eskirgan. Qayta urinib ko‘ring.'});}
+  if(payload.purpose!=='account-recovery') return res.status(401).json({error:'Tiklash ruxsati noto‘g‘ri.'});
+  const username=String(req.body.username||'').trim(); const password=String(req.body.password||'');
+  if(!username&&!password) return res.status(400).json({error:'Yangi login yoki parol kiriting.'});
+  if(username&&(!/^[a-zA-Z0-9_]{3,20}$/.test(username)||!isCleanLogin(username))) return res.status(400).json({error:'Login 3–20 belgidan iborat bo‘lsin va odob qoidalariga mos bo‘lsin.'});
+  if(password&&password.length<6) return res.status(400).json({error:'Parol kamida 6 ta belgidan iborat bo‘lsin.'});
+  const user=await users.findOne({id:payload.id});if(!user)return res.status(404).json({error:'Akkaunt topilmadi.'});
+  if(username&&username.toLowerCase()!==user.lower&&await users.findOne({lower:username.toLowerCase()}))return res.status(409).json({error:'Bu login band.'});
+  const set={};if(username){set.username=username;set.lower=username.toLowerCase();}if(password)set.hash=bcrypt.hashSync(password,10);
+  await users.updateOne({id:user.id},{$set:set});
+  res.json({ok:true,token:sign({...user,...set}),user:{username:set.username||user.username,role:user.role}});
 }));
 
 // Testlar: foydalanuvchilar faqat faol testlarni ko‘radi.
@@ -425,6 +469,7 @@ app.post('/api/admin/users', auth, ownerOnly, wrap(async (req, res) => {
   const username = String(req.body.username || '').trim();
   const password = String(req.body.password || '');
   if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) return res.status(400).json({ error: "Login 3-20 ta harf, raqam yoki _ bo'lishi kerak" });
+  if (!isCleanLogin(username)) return res.status(400).json({ error: 'Bu login odob-axloq qoidalariga mos emas. Boshqa login tanlang.' });
   if (password.length < 8) return res.status(400).json({ error: "Admin paroli kamida 8 ta belgi bo'lsin" });
   try {
     await users.insertOne({ id: crypto.randomUUID(), username, lower: username.toLowerCase(),
@@ -835,6 +880,8 @@ async function pollTelegram() {
       }
 
       if (text.startsWith('/start')) {
+        const recoverMatch = text.match(/^\/start\s+recover_([a-f0-9]{36})$/i);
+        if (recoverMatch) { const pending=await pendingRecoveries.findOne({nonce:recoverMatch[1],expires:{$gt:Date.now()}}); if(!pending?.codeForBot){await telegramSend(chatId,'Tiklash havolasi eskirgan. Saytda qaytadan urinib ko‘ring.');continue;} await pendingRecoveries.updateOne({nonce:pending.nonce},{$set:{chatId:String(chatId),telegramUserId:String((msg.from||{}).id||chatId)}}); await telegramSend(chatId,`🔐 Akkauntni tiklash kodingiz: ${pending.codeForBot}\n\nBu kod 10 daqiqa amal qiladi. Uni faqat saytning tiklash oynasiga kiriting.`); continue; }
         const match = text.match(/^\/start\s+([a-f0-9]{36})$/i);
         if (match) { const pending = await pendingRegs.findOne({ nonce: match[1], expires: { $gt: Date.now() } }); if (!pending?.codeForBot) { await telegramSend(chatId, 'Tasdiqlash havolasi eskirgan. Saytda qaytadan ro‘yxatdan o‘tishni boshlang.', { reply_markup: USER_MENU }); continue; } await pendingRegs.updateOne({ nonce: pending.nonce }, { $set: { chatId, telegramUserId: String((msg.from || {}).id || chatId), telegramUsername: (msg.from || {}).username || null, telegramFirstName: (msg.from || {}).first_name || null } }); await telegramSend(chatId, `Assalomu alaykum! 👋\n\nTelegram foydalanuvchisi: ${displayTelegramUser(msg.from || {})}\n\nSaytingiz uchun tasdiqlash kodingiz: ${pending.codeForBot}`, { reply_markup: menuFor(role) }); continue; }
         if (/^\/start\s+pro$/i.test(text)) { await showBotPlans(chatId); continue; }
@@ -867,6 +914,9 @@ async function pollTelegram() {
   promos = db.collection('promos');
   tariffs = db.collection('tariffs');
   pendingRegs = db.collection('pendingRegs');
+  pendingRecoveries = db.collection('pendingRecoveries');
+  await pendingRecoveries.createIndex({ nonce: 1 }, { unique: true });
+  await pendingRecoveries.createIndex({ expires: 1 }, { expireAfterSeconds: 0 });
   tests = db.collection('tests');
   community = db.collection('community');
   await community.createIndex({ created: -1 });
@@ -909,6 +959,10 @@ async function pollTelegram() {
   );
   app.listen(process.env.PORT || 3000, () => { console.log('Sayt ishga tushdi'); if (TELEGRAM_BOT_TOKEN) { if (!ADMIN_TELEGRAM_ID) console.warn('ADMIN_TELEGRAM_ID kiritilmagan: admin xabarlari va anonim murojaatlar ishlamaydi.'); pollTelegram(); } else console.warn('TELEGRAM_BOT_TOKEN kiritilmagan: Telegram tasdiqlash o‘chiq.'); });
 })().catch(e => { console.error('Bazaga ulanib bo\'lmadi:', e.message); process.exit(1); });
+
+
+
+
 
 
 

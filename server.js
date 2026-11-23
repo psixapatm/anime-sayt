@@ -1,6 +1,8 @@
 
 
-Загрузка изображения анализа…
+
+
+
 
 
 
@@ -469,7 +471,7 @@ app.post('/api/certificates', auth, wrap(async (req, res) => {
   const user = await users.findOne({ id: req.user.id });
   const attempt = (user.testResults || []).filter(x => x.testId === testId && x.passed && x.percent >= (t?.passPercent || 70)).sort((a,b) => b.at - a.at)[0];
   const fullName = String(user.profileName || '').trim();
-  if (!t || !attempt || !fullName || !/^[\p{L} .'-]{2,80}$/u.test(fullName)) return res.status(400).json({ error: 'Sertifikat uchun profilingizda ism-familiya saqlangan bo‘lishi va testdan o‘tgan bo‘lishingiz kerak.' });
+  if (!t || !attempt || !fullName || !/^[\p{L}\p{M} .\-\u0027\u2018\u2019\u02BB\u02BC]{2,80}$/u.test(fullName)) return res.status(400).json({ error: 'Sertifikat uchun profilingizda ism-familiya saqlangan bo‘lishi va testdan o‘tgan bo‘lishingiz kerak.' });
   const cert = { id: 'DK-' + crypto.randomBytes(5).toString('hex').toUpperCase(), fullName, courseTitle: t.courseTitle, issuer: 'Sobirov Muhammadumar', percent: attempt.percent, created: Date.now() };
   await users.updateOne({ id: req.user.id }, { $push: { certificates: { $each: [cert], $slice: -30 } } });
   res.json(cert);
@@ -1020,10 +1022,6 @@ async function pollTelegram() {
   );
   app.listen(process.env.PORT || 3000, () => { console.log('Sayt ishga tushdi'); if (TELEGRAM_BOT_TOKEN) { if (!ADMIN_TELEGRAM_ID) console.warn('ADMIN_TELEGRAM_ID kiritilmagan: admin xabarlari va anonim murojaatlar ishlamaydi.'); pollTelegram(); } else console.warn('TELEGRAM_BOT_TOKEN kiritilmagan: Telegram tasdiqlash o‘chiq.'); });
 })().catch(e => { console.error('Bazaga ulanib bo\'lmadi:', e.message); process.exit(1); });
-
-
-
-
 
 
 

@@ -6,8 +6,6 @@
 
 
 
-
-
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -274,6 +272,9 @@ app.put('/api/profile', auth, wrap(async (req, res) => {
   if (badge !== 'none' && (u.proUntil || 0) <= Date.now()) return res.status(403).json({ error: 'Profil bezaklari faqat faol Pro obunachilar uchun.' });
   const oldName = String(u.profileName || '').trim();
   const nameChanged = !!oldName && profileName !== oldName;
+  if (oldName && !profileName) return res.status(400).json({ error: 'Ism-familiyani bo‘sh qoldirib bo‘lmaydi.' });
+  if (nameChanged && (u.certificates || []).length) return res.status(403).json({ error: 'Sertifikat berilgandan keyin ismni o‘zgartirib bo‘lmaydi.' });
+  if (nameChanged && u.profileNameEditUsed) return res.status(403).json({ error: 'Ismni tahrirlash imkoniyati bir marta ishlatilgan.' });
   if (nameChanged) { const currentPassword = String(req.body.currentPassword || ''); if (!currentPassword || !bcrypt.compareSync(currentPassword, u.hash)) return res.status(401).json({ error: 'Ismni tahrirlash uchun akkaunt parolingizni kiriting.' }); }
   const set = { badge };
   if (!oldName || profileName === oldName || nameChanged) set.profileName = profileName;

@@ -65,7 +65,7 @@ const testRateLimit = rateLimit({ windowMs: 60_000, max: 8, key: 'test' });
 
 app.get('/styles.css', (req, res) => res.sendFile(path.join(__dirname, 'styles.css')));
 app.get('/app.js', (req, res) => res.sendFile(path.join(__dirname, 'app.js')));
-app.get('/logo-mark.webp', (req, res) => res.sendFile(path.join(__dirname, 'logo-mark.webp')));
+app.get('/logo-mark.png', (req, res) => res.sendFile(path.join(__dirname, 'logo-mark.webp')));
 app.get('/favicon-32.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon-32.png')));
 app.get('/favicon-64.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon-64.png')));
 app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon.ico')));

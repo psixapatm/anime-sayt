@@ -14,6 +14,168 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -21,41 +183,89 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { MongoClient } = require('mongodb');
 
-const { MONGODB_URI, ADMIN_USER, ADMIN_PASS } = process.env;
+const { MONGODB_URI, ADMIN_USER, ADMIN_PASS, JWT_SECRET } = process.env;
 if (!MONGODB_URI || !ADMIN_USER || !ADMIN_PASS) {
   console.error('MONGODB_URI, ADMIN_USER va ADMIN_PASS o\'zgaruvchilari kiritilishi shart.');
   process.exit(1);
 }
-const SECRET = process.env.JWT_SECRET ||
-  crypto.createHash('sha256').update(MONGODB_URI + ADMIN_PASS).digest('hex');
+if (!JWT_SECRET || Buffer.byteLength(JWT_SECRET, 'utf8') < 32) {
+  console.error('JWT_SECRET alohida, kamida 32 baytli tasodifiy kalit bo‘lishi shart.');
+  process.exit(1);
+}
+const SECRET = JWT_SECRET;
 
 const app = express();
-let users, animes, comments, genres, reactions, notifs, promos, tariffs, pendingRegs, pendingRecoveries, telegramLinks, tests, community;
+let users, animes, comments, genres, reactions, notifs, promos, tariffs, pendingRegs, pendingRecoveries, telegramLinks, tests, community, certificates, testAttempts, lessonProgress, aiHistory;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_BOT_USERNAME = 'verification_zverbot';
 const ADMIN_TELEGRAM_ID = String(process.env.ADMIN_TELEGRAM_ID || '').trim();
-let botReplies, payments, botSettings, telegramAdmins, blockedUsers, adminLogs;
+const WEBHOOK_ENABLED = !!(process.env.TELEGRAM_WEBHOOK_URL && process.env.TELEGRAM_WEBHOOK_SECRET && Buffer.byteLength(process.env.TELEGRAM_WEBHOOK_SECRET, 'utf8') >= 32);
+let botReplies, payments, botSettings, telegramAdmins, blockedUsers, adminLogs, database, telegramWebhookQueue;
 
-app.use(express.json({ limit: '100kb' }));
-app.get('/logo-mark.png', (req, res) => res.sendFile(path.join(__dirname, 'logo-mark.png')));
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+app.use(express.json({ limit: '100kb', strict: true }));
+
+// Per-IP va endpoint bo‘yicha so‘rovlar limiti (Render bitta instance uchun).
+const rateBuckets = new Map();
+function rateLimit({ windowMs = 60_000, max = 20, key = 'default' } = {}) {
+  return (req, res, next) => {
+    const now = Date.now();
+    const ip = String(req.ip || req.socket.remoteAddress || 'unknown');
+    const bucketKey = key + ':' + ip;
+    let bucket = rateBuckets.get(bucketKey);
+    if (!bucket || bucket.until <= now) bucket = { count: 0, until: now + windowMs };
+    bucket.count++;
+    rateBuckets.set(bucketKey, bucket);
+    if (rateBuckets.size > 5000) for (const [k, v] of rateBuckets) if (v.until <= now) rateBuckets.delete(k);
+    res.setHeader('RateLimit-Limit', String(max));
+    res.setHeader('RateLimit-Remaining', String(Math.max(0, max - bucket.count)));
+    if (bucket.count > max) {
+      res.setHeader('Retry-After', String(Math.ceil((bucket.until - now) / 1000)));
+      return res.status(429).json({ error: 'Juda ko‘p so‘rov yuborildi. Biroz kutib qayta urinib ko‘ring.' });
+    }
+    next();
+  };
+}
+const authRateLimit = rateLimit({ windowMs: 15 * 60_000, max: 12, key: 'auth' });
+const actionRateLimit = rateLimit({ windowMs: 60_000, max: 12, key: 'action' });
+const commentRateLimit = rateLimit({ windowMs: 10 * 60_000, max: 8, key: 'comment' });
+const testRateLimit = rateLimit({ windowMs: 60_000, max: 8, key: 'test' });
+
+app.get('/styles.css', (req, res) => res.sendFile(path.join(__dirname, 'styles.css')));
+app.get('/app.js', (req, res) => res.sendFile(path.join(__dirname, 'app.js')));
+app.get('/logo-mark.webp', (req, res) => res.sendFile(path.join(__dirname, 'logo-mark.webp')));
+app.get('/favicon-32.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon-32.png')));
+app.get('/favicon-64.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon-64.png')));
+app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon.ico')));
+app.get('/apple-touch-icon.png', (req, res) => res.sendFile(path.join(__dirname, 'apple-touch-icon.png')));
 app.get('/certificate-signature.png', (req, res) => res.sendFile(path.join(__dirname, 'certificate-signature.png')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 const wrap = (fn) => (req, res) => fn(req, res).catch(e => {
   console.error(e); res.status(500).json({ error: 'Server xatosi' });
 });
-const sign = (u) => jwt.sign({ id: u.id, username: u.username, role: u.role }, SECRET, { expiresIn: '30d' });
+const sign = (u) => jwt.sign({ id: u.id, username: u.username, role: u.role, ver: Number(u.tokenVersion || 0) }, SECRET, { algorithm: 'HS256', expiresIn: '7d' });
 const badLoginWords = ['fuck','shit','bitch','asshole','сука','бляд','хуй','пизд','еба','ахмок','ахмоқ','каллакесар','хароми','haromi','iflos','ahmoq','axmoq','suka','blyad','xuy','pizd','ebla'];
 const isCleanLogin = (value) => { const v = String(value || '').toLowerCase().replace(/[_0-9]/g, ''); return !badLoginWords.some(w => v.includes(w)); };
 const isCleanNickname = (value) => { const v = String(value || '').toLocaleLowerCase().replace(/[\s._'’\-0-9]/gu, ''); return !badLoginWords.some(w => v.includes(w)); };
 
 
 function auth(req, res, next) {
-  const t = (req.headers.authorization || '').replace('Bearer ', '');
+  const header = String(req.headers.authorization || '');
+  const match = header.match(/^Bearer ([A-Za-z0-9._-]+)$/);
+  if (!match) return res.status(401).json({ error: 'Avval tizimga kiring' });
   let p;
-  try { p = jwt.verify(t, SECRET); } catch { return res.status(401).json({ error: 'Avval tizimga kiring' }); }
+  try { p = jwt.verify(match[1], SECRET, { algorithms: ['HS256'] }); } catch { return res.status(401).json({ error: 'Avval tizimga kiring' }); }
   users.findOne({ id: p.id }).then(u => {
-    if (!u) return res.status(401).json({ error: 'Avval tizimga kiring' });
+    if (!u || Number(p.ver || 0) !== Number(u.tokenVersion || 0)) return res.status(401).json({ error: 'Sessiya eskirgan. Qayta tizimga kiring.' });
     req.user = { id: u.id, username: u.username, role: u.role, adminLevel: u.adminLevel || null, owner: u.lower === ADMIN_USER.toLowerCase(), pro: (u.proUntil || 0) > Date.now() };
     next();
   }).catch(() => res.status(500).json({ error: 'Server xatosi' }));
@@ -71,31 +281,36 @@ const admin = (req, res, next) =>
   req.user.role === 'admin' ? next() : res.status(403).json({ error: 'Faqat admin uchun' });
 
 // Ro'yxatdan o'tish: Telegram bot orqali 6 xonali tasdiqlash kodi.
-app.post('/api/register/start', wrap(async (req, res) => {
+app.post('/api/register/start', authRateLimit, wrap(async (req, res) => {
   if (!TELEGRAM_BOT_TOKEN) return res.status(503).json({ error: 'Telegram bot tokeni Render Environment bo‘limiga kiritilmagan.' });
   const username = String(req.body.username || '').trim();
   const password = String(req.body.password || '');
   if (!/^[a-zA-Z0-9_]{3,20}$/.test(username))
     return res.status(400).json({ error: "Login 3-20 ta harf, raqam yoki _ bo'lishi kerak" });
   if (!isCleanLogin(username)) return res.status(400).json({ error: 'Bu login odob-axloq qoidalariga mos emas. Boshqa login tanlang.' });
-  if (password.length < 6) return res.status(400).json({ error: "Parol kamida 6 ta belgi bo'lishi kerak" });
+  if (password.length < 8) return res.status(400).json({ error: "Parol kamida 8 ta belgidan iborat bo‘lishi kerak" });
   if (await users.findOne({ lower: username.toLowerCase() })) return res.status(409).json({ error: 'Bu login band' });
   const nonce = crypto.randomBytes(18).toString('hex');
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
   await pendingRegs.deleteMany({ $or: [{ lower: username.toLowerCase() }, { expires: { $lte: Date.now() } }] });
   await pendingRegs.insertOne({ nonce, username, lower: username.toLowerCase(), hash: bcrypt.hashSync(password, 10),
-    codeHash: crypto.createHash('sha256').update(code).digest('hex'), codeForBot: code, chatId: null, created: Date.now(), expires: Date.now() + 10 * 60 * 1000 });
+    codeHash: crypto.createHash('sha256').update(code).digest('hex'), codeForBot: code, chatId: null, attempts: 0, created: Date.now(), expires: Date.now() + 10 * 60 * 1000 });
   res.json({ ok: true, botUrl: `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${nonce}` });
 }));
 
-app.post('/api/register/verify', wrap(async (req, res) => {
+app.post('/api/register/verify', authRateLimit, wrap(async (req, res) => {
   const nonce = String(req.body.nonce || '');
   const code = String(req.body.code || '').trim();
   if (!/^[a-f0-9]{36}$/.test(nonce) || !/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Tasdiqlash kodi yoki havola noto‘g‘ri.' });
   const pending = await pendingRegs.findOne({ nonce, expires: { $gt: Date.now() }, chatId: { $ne: null } });
   if (!pending) return res.status(400).json({ error: 'Avval botdagi havolani ochib Start bosing. Kod 10 daqiqa amal qiladi.' });
   const digest = crypto.createHash('sha256').update(code).digest('hex');
-  if (digest !== pending.codeHash) return res.status(400).json({ error: 'Tasdiqlash kodi noto‘g‘ri.' });
+  if (digest !== pending.codeHash) {
+    const attempts = Number(pending.attempts || 0) + 1;
+    if (attempts >= 5) await pendingRegs.deleteOne({ nonce });
+    else await pendingRegs.updateOne({ nonce }, { $set: { attempts } });
+    return res.status(400).json({ error: attempts >= 5 ? 'Kod 5 marta noto‘g‘ri kiritildi. Qayta ro‘yxatdan o‘ting.' : `Tasdiqlash kodi noto‘g‘ri. Qolgan urinish: ${5 - attempts}.` });
+  }
   // Oddiy foydalanuvchi uchun: bitta Telegram akkaunti faqat bitta sayt akkauntiga.
   // Owner (ADMIN_USER) ushbu cheklovdan mustasno.
   const telegramUserId = String(pending.telegramUserId || pending.chatId);
@@ -142,7 +357,7 @@ app.post('/api/register/verify', wrap(async (req, res) => {
   res.json({ token: sign(user), user: { username: user.username, role: 'user' } });
 }));
 
-app.post('/api/login', wrap(async (req, res) => {
+app.post('/api/login', authRateLimit, wrap(async (req, res) => {
   const name = String(req.body.username || '').toLowerCase();
   const user = await users.findOne({ lower: name });
   if (!user || !bcrypt.compareSync(String(req.body.password || ''), user.hash))
@@ -153,15 +368,29 @@ app.post('/api/login', wrap(async (req, res) => {
 app.get('/api/me', auth, wrap(async (req, res) => {
   const u = await users.findOne({ id: req.user.id });
   if (!u) return res.status(401).json({ error: 'Avval tizimga kiring' });
-  res.json({ id: u.id, username: u.username, role: u.role, adminLevel: u.adminLevel || null, favs: u.favs || [], owner: u.lower === ADMIN_USER.toLowerCase(), proUntil: u.proUntil || null, pro: (u.proUntil || 0) > Date.now(), profileName: u.profileName || '', profileNameEditUsed: !!u.profileNameEditUsed, badge: u.badge || 'none', recent: u.recent || [], certificates: u.certificates || [], xp: u.xp || 0, watchedEpisodes: u.watchedEpisodes || [], testResults: u.testResults || [] });
+  const savedCertificates = certificates ? await certificates.find({ userId: u.id }, { projection: { _id: 0, userId: 0, testId: 0 } }).sort({ created: -1 }).toArray() : (u.certificates || []);
+  const watched = lessonProgress ? await lessonProgress.find({ userId: u.id, watchedSeconds: { $gt: 0 } }, { projection: { courseId: 1, episodeId: 1 } }).toArray() : [];
+  const watchedEpisodes = [...new Set([...(u.watchedEpisodes || []), ...watched.map(p => p.courseId + ':' + p.episodeId)])];
+  res.json({ id: u.id, username: u.username, role: u.role, adminLevel: u.adminLevel || null, favs: u.favs || [], owner: u.lower === ADMIN_USER.toLowerCase(), proUntil: u.proUntil || null, pro: (u.proUntil || 0) > Date.now(), profileName: u.profileName || '', profileNameEditUsed: !!u.profileNameEditUsed, badge: u.badge || 'none', recent: u.recent || [], certificates: savedCertificates, xp: u.xp || 0, watchedEpisodes, testResults: u.testResults || [] });
 }));
 
 app.get('/api/anime', auth, wrap(async (req, res) => {
   const full = req.user.owner || req.user.role === 'admin' || req.user.pro;
   const all = await animes.find({}, { projection: { _id: 0 } }).sort({ created: -1 }).toArray();
-  res.json(all.map(a => full ? a : { ...a,
-    video: a.videoPro ? '' : a.video, locked: !!(a.videoPro && a.video),
-    episodes: (a.episodes || []).map(e => e.pro ? { ...e, video: '', locked: true } : e) }));
+  const completed = new Set((await lessonProgress.find({ userId: req.user.id, passed: true }).toArray()).map(p => p.courseId + ':' + p.episodeId));
+  res.json(all.map(a => {
+    const ordered = (a.episodes || []).slice().sort((x,y) => (x.order ?? 1e9) - (y.order ?? 1e9));
+    const unlocked = new Set();
+    ordered.forEach((ep, i) => { if (i === 0 || completed.has(a.id + ':' + ordered[i-1].id)) unlocked.add(ep.id); });
+    return { ...a,
+      video: full && !a.videoPro ? a.video : (a.videoPro && !full ? '' : a.video),
+      episodes: (a.episodes || []).map(e => {
+        const sequenceLocked = !unlocked.has(e.id);
+        const proLocked = !!e.pro && !full;
+        return { ...e, video: sequenceLocked || proLocked ? '' : e.video, locked: sequenceLocked || proLocked, sequenceLocked };
+      })
+    };
+  }));
 }));
 
 const isUrl = (s) => /^https?:\/\//i.test(s);
@@ -203,6 +432,13 @@ app.get('/api/videos/:videoId/play', auth, wrap(async (req, res) => {
   const course = await animes.findOne({ $or: [{ video: marker }, { 'episodes.video': marker }] });
   if (!course) return res.status(404).json({ error: 'Video kursga biriktirilmagan yoki topilmadi.' });
   const episode = (course.episodes || []).find(e => e.video === marker);
+  if (episode) {
+    const ordered = (course.episodes || []).slice().sort((a,b) => (a.order ?? 1e9) - (b.order ?? 1e9));
+    const index = ordered.findIndex(e => e.id === episode.id);
+    if (index > 0 && !(await lessonProgress.findOne({ userId: req.user.id, courseId: course.id, episodeId: ordered[index - 1].id, passed: true }))) {
+      return res.status(403).json({ error: 'Avval oldingi dars testidan o‘ting.' });
+    }
+  }
   const needsPro = episode ? !!episode.pro : !!course.videoPro;
   if (needsPro && !req.user.owner && req.user.role !== 'admin' && !req.user.pro)
     return res.status(403).json({ error: 'Bu dars faqat Pro obunachilar uchun.' });
@@ -226,7 +462,7 @@ app.post('/api/anime', auth, mainAdminOnly, wrap(async (req, res) => {
   if (a.poster && !isUrl(a.poster)) return res.status(400).json({ error: 'Poster havolasi http(s) bilan boshlanishi kerak' });
   if (a.video && !isVideoRef(a.video)) return res.status(400).json({ error: 'YouTube video havolasini tekshiring' });
   // Kurs yaratilishida kiritilgan asosiy video avtomatik 1-qism bo'ladi.
-  a.episodes = a.video ? [{ id: crypto.randomUUID(), title: '1-qism', video: a.video, order: 1, pro: !!b.videoPro, views: 0 }] : [];
+  a.episodes = a.video ? [{ id: crypto.randomUUID(), title: '1-qism', video: a.video, order: 1, pro: !!b.videoPro, durationSeconds: 0, views: 0 }] : [];
   await animes.insertOne(a);
   await notify("Yangi kurs qo'shildi: " + a.title);
   res.json({ ok: true });
@@ -244,7 +480,9 @@ function cleanEp(b) {
   const video = String(b.video || '').trim();
   if (!title || !isVideoRef(video)) return { error: 'Dars nomi va video havolasi yoki yuklangan video kerak' };
   const order = parseInt(b.order);
-  return { v: { title, video, order: Number.isFinite(order) ? order : null, pro: !!b.pro } };
+  const durationSeconds = parseInt(b.durationSeconds);
+  if (!Number.isInteger(durationSeconds) || durationSeconds < 60 || durationSeconds > 86400) return { error: 'Video davomiyligini sekundda kiriting (60–86400).' };
+  return { v: { title, video, order: Number.isFinite(order) ? order : null, pro: !!b.pro, durationSeconds } };
 }
 app.post('/api/anime/:id/episodes', auth, mainAdminOnly, wrap(async (req, res) => {
   const ep = cleanEp(req.body);
@@ -257,16 +495,14 @@ app.put('/api/anime/:id/episodes/:eid', auth, mainAdminOnly, wrap(async (req, re
   const ep = cleanEp(req.body);
   if (ep.error) return res.status(400).json({ error: ep.error });
   await animes.updateOne({ id: req.params.id, 'episodes.id': req.params.eid },
-    { $set: { 'episodes.$.title': ep.v.title, 'episodes.$.video': ep.v.video, 'episodes.$.order': ep.v.order, 'episodes.$.pro': ep.v.pro } });
+    { $set: { 'episodes.$.title': ep.v.title, 'episodes.$.video': ep.v.video, 'episodes.$.order': ep.v.order, 'episodes.$.pro': ep.v.pro, 'episodes.$.durationSeconds': ep.v.durationSeconds } });
   res.json({ ok: true });
 }));
-app.post('/api/anime/:id/episodes/:eid/view', auth, wrap(async (req, res) => {
-  await animes.updateOne({ id: req.params.id, 'episodes.id': req.params.eid }, { $inc: { 'episodes.$.views': 1 } });
-  const key = req.params.id + ':' + req.params.eid;
-  const u = await users.findOne({ id: req.user.id });
-  const firstView = !(u.watchedEpisodes || []).includes(key);
-  if (firstView) await users.updateOne({ id: req.user.id }, { $addToSet: { watchedEpisodes: key }, $inc: { xp: 5 } });
-  res.json({ ok: true, xpEarned: firstView ? 5 : 0 });
+app.post('/api/anime/:id/episodes/:eid/view', auth, actionRateLimit, wrap(async (req, res) => {
+  const result = await animes.updateOne({ id: req.params.id, 'episodes.id': req.params.eid }, { $inc: { 'episodes.$.views': 1 } });
+  if (!result.matchedCount) return res.status(404).json({ error: 'Dars topilmadi.' });
+  // XP bu endpointdan berilmaydi: oddiy POST orqali XP yig‘ishning oldi olindi.
+  res.json({ ok: true, xpEarned: 0 });
 }));
 app.delete('/api/anime/:id/episodes/:eid', auth, mainAdminOnly, wrap(async (req, res) => {
   await animes.updateOne({ id: req.params.id }, { $pull: { episodes: { id: req.params.eid } } });
@@ -285,7 +521,7 @@ app.post('/api/anime/:id/fav', auth, wrap(async (req, res) => {
 app.get('/api/anime/:id/comments', auth, wrap(async (req, res) => {
   res.json(await comments.find({ animeId: req.params.id }, { projection: { _id: 0 } }).sort({ created: -1 }).limit(100).toArray());
 }));
-app.post('/api/anime/:id/comments', auth, wrap(async (req, res) => {
+app.post('/api/anime/:id/comments', auth, commentRateLimit, wrap(async (req, res) => {
   const text = String(req.body.text || '').trim().slice(0, 500);
   if (!text) return res.status(400).json({ error: "Izoh bo'sh bo'lmasin" });
   await comments.insertOne({ id: crypto.randomUUID(), animeId: req.params.id, userId: req.user.id, username: req.user.username, text, created: Date.now() });
@@ -308,11 +544,12 @@ app.post('/api/anime/:id/view', auth, wrap(async (req, res) => {
 }));
 
 // Profil: nik istalgan vaqtda tahrirlanadi; odob-axloq filtri va PRO bezagi.
-app.put('/api/profile', auth, wrap(async (req, res) => {
+app.put('/api/profile', auth, actionRateLimit, wrap(async (req, res) => {
   const profileName = String(req.body.profileName || '').trim().replace(/\s+/g, ' ').slice(0, 80);
   const badge = String(req.body.badge || 'none');
   const allowed = ['none','crown','star','fire','diamond','code'];
   if (profileName && (profileName.length < 2 || profileName.length > 80)) return res.status(400).json({ error: 'Ism-familiya 2–80 belgidan iborat bo‘lishi kerak.' });
+  if (profileName && !/^[\p{L}\p{M} .\-'’]{2,80}$/u.test(profileName)) return res.status(400).json({ error: 'Ism-familiyada faqat harflar, bo‘sh joy va oddiy tire/apostrof ishlating.' });
   if (profileName && !isCleanNickname(profileName)) return res.status(400).json({ error: 'Bu nik odob-axloq qoidalariga mos emas. Iltimos, boshqa nik tanlang.' });
   if (!allowed.includes(badge)) return res.status(400).json({ error: 'Belgi noto‘g‘ri.' });
   const u = await users.findOne({ id: req.user.id });
@@ -322,15 +559,13 @@ app.put('/api/profile', auth, wrap(async (req, res) => {
   if (oldName && !profileName) return res.status(400).json({ error: 'Ism-familiyani bo‘sh qoldirib bo‘lmaydi.' });
   if (nameChanged && !bcrypt.compareSync(String(req.body.currentPassword || ''), u.hash)) return res.status(401).json({ error: 'Ismni o‘zgartirish uchun joriy parolingizni to‘g‘ri kiriting.' });
   const set = { badge, profileName };
-  if (profileName !== oldName && Array.isArray(u.certificates) && u.certificates.length) {
-    set.certificates = u.certificates.map(c => ({ ...c, fullName: profileName }));
-  }
+  // Sertifikatdagi ism berilgan paytdagi snapshot bo‘lib qoladi.
   await users.updateOne({ id: req.user.id }, { $set: set, $unset: { profileNameEditUsed: '' } });
   res.json({ ok: true, profileName: set.profileName, badge, profileNameEditUsed: false });
 }));
 
 // Login/parolni o‘zgartirish: tasdiqlash kodi faqat foydalanuvchining ulangan Telegram chatiga yuboriladi.
-app.post('/api/account/change/start', auth, wrap(async (req, res) => {
+app.post('/api/account/change/start', auth, actionRateLimit, wrap(async (req, res) => {
   if (!TELEGRAM_BOT_TOKEN) return res.status(503).json({ error: 'Telegram bot hozircha sozlanmagan.' });
   const user = await users.findOne({ id: req.user.id });
   if (!user?.telegramChatId) return res.status(400).json({ error: 'Telegram hisobingiz ulanmagan. Avval bot orqali ro‘yxatdan o‘tgan hisobdan foydalaning.' });
@@ -339,7 +574,7 @@ app.post('/api/account/change/start', auth, wrap(async (req, res) => {
   if (!username && !password) return res.status(400).json({ error: 'Yangi login yoki yangi parol kiriting.' });
   if (username && !/^[a-zA-Z0-9_]{3,20}$/.test(username)) return res.status(400).json({ error: 'Login 3–20 ta harf, raqam yoki _ dan iborat bo‘lishi kerak.' });
   if (username && !isCleanLogin(username)) return res.status(400).json({ error: 'Bu login odob-axloq qoidalariga mos emas. Boshqa login tanlang.' });
-  if (password && password.length < 6) return res.status(400).json({ error: 'Yangi parol kamida 6 ta belgidan iborat bo‘lsin.' });
+  if (password && password.length < 8) return res.status(400).json({ error: 'Yangi parol kamida 8 ta belgidan iborat bo‘lsin.' });
   if (username && username.toLowerCase() !== user.lower && await users.findOne({ lower: username.toLowerCase() })) return res.status(409).json({ error: 'Bu login band.' });
   if (user.pendingAccountChange?.created > Date.now() - 60 * 1000) return res.status(429).json({ error: 'Yangi kod so‘rashdan oldin 1 daqiqa kuting.' });
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
@@ -349,7 +584,7 @@ app.post('/api/account/change/start', auth, wrap(async (req, res) => {
   catch (e) { await users.updateOne({ id: user.id }, { $unset: { pendingAccountChange: '' } }); return res.status(502).json({ error: 'Telegramga kod yuborilmadi. Botni ochib /start bosing va qayta urinib ko‘ring.' }); }
   res.json({ ok: true, message: 'Tasdiqlash kodi Telegram botingizga yuborildi.', botUrl: `https://t.me/${TELEGRAM_BOT_USERNAME}` });
 }));
-app.post('/api/account/change/verify', auth, wrap(async (req, res) => {
+app.post('/api/account/change/verify', auth, actionRateLimit, wrap(async (req, res) => {
   const code = String(req.body.code || '').trim();
   if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: '6 xonali kodni kiriting.' });
   const user = await users.findOne({ id: req.user.id });
@@ -365,12 +600,13 @@ app.post('/api/account/change/verify', auth, wrap(async (req, res) => {
   if (pending.username && pending.username.toLowerCase() !== user.lower && await users.findOne({ lower: pending.username.toLowerCase() })) return res.status(409).json({ error: 'Bu login boshqa foydalanuvchi tomonidan band qilindi. Yangi login bilan qayta urinib ko‘ring.' });
   if (pending.username) { set.username = pending.username; set.lower = pending.username.toLowerCase(); }
   if (pending.hash) set.hash = pending.hash;
+  set.tokenVersion = Number(user.tokenVersion || 0) + 1;
   await users.updateOne({ id: user.id }, { $set: set, $unset: { pendingAccountChange: '' } });
-  res.json({ ok: true, username: set.username || user.username, message: 'Akaunt ma’lumotlari muvaffaqiyatli yangilandi.' });
+  res.json({ ok: true, token: sign({ ...user, ...set }), username: set.username || user.username, message: 'Akaunt ma’lumotlari muvaffaqiyatli yangilandi.' });
 }));
 
 // Akkauntni tiklash: Telegram orqali bog‘langan akkauntni aniqlash va 6 xonali kod.
-app.post('/api/recovery/start', wrap(async (req, res) => {
+app.post('/api/recovery/start', authRateLimit, wrap(async (req, res) => {
   if (!TELEGRAM_BOT_TOKEN) return res.status(503).json({ error: 'Telegram bot hozircha sozlanmagan.' });
   const nonce = crypto.randomBytes(18).toString('hex');
   const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
@@ -378,10 +614,10 @@ app.post('/api/recovery/start', wrap(async (req, res) => {
   await pendingRecoveries.insertOne({ nonce, codeHash: crypto.createHash('sha256').update(code).digest('hex'), codeForBot: code, chatId: null, created: Date.now(), expires: Date.now()+10*60*1000, attempts: 0 });
   res.json({ ok: true, botUrl: `https://t.me/${TELEGRAM_BOT_USERNAME}?start=recover_${nonce}`, nonce });
 }));
-app.post('/api/recovery/verify', wrap(async (req, res) => {
+app.post('/api/recovery/verify', authRateLimit, wrap(async (req, res) => {
   const nonce=String(req.body.nonce||''); const code=String(req.body.code||'').trim();
   if (!/^[a-f0-9]{36}$/.test(nonce) || !/^\d{6}$/.test(code)) return res.status(400).json({error:'Havola yoki 6 xonali kod noto‘g‘ri.'});
-  const pending=await pendingRecoveries.findOne({nonce,expires:{$gt:Date.now()},chatId:{$ne:null}});
+  const pending=await pendingRecoveries.findOne({nonce,expires:{$gt:Date.now()},chatId:{$ne:null},attempts:{$lt:5}});
   if(!pending) return res.status(400).json({error:'Botda Start bosilmagan yoki kod muddati tugagan.'});
   if(crypto.createHash('sha256').update(code).digest('hex')!==pending.codeHash){const n=(pending.attempts||0)+1;await pendingRecoveries.updateOne({nonce}, n>=5?{$set:{attempts:n},$unset:{codeForBot:''}}:{$set:{attempts:n}});return res.status(400).json({error:'Kod noto‘g‘ri yoki urinishlar tugadi.'});}
   const linked=await users.find({$or:[{telegramChatId:String(pending.chatId)},{telegramUserId:String(pending.telegramUserId||'')}] }).toArray();
@@ -390,45 +626,223 @@ app.post('/api/recovery/verify', wrap(async (req, res) => {
   await pendingRecoveries.deleteOne({nonce});
   res.json({ok:true,recoveryToken:jwt.sign({id:eligible[0].id,purpose:'account-recovery'},SECRET,{expiresIn:'10m'}),username:eligible[0].username});
 }));
-app.post('/api/recovery/complete', wrap(async(req,res)=>{
+app.post('/api/recovery/complete', authRateLimit, wrap(async(req,res)=>{
   let payload;try{payload=jwt.verify(String(req.body.recoveryToken||''),SECRET);}catch{return res.status(401).json({error:'Tiklash sessiyasi eskirgan. Qayta urinib ko‘ring.'});}
   if(payload.purpose!=='account-recovery') return res.status(401).json({error:'Tiklash ruxsati noto‘g‘ri.'});
   const username=String(req.body.username||'').trim(); const password=String(req.body.password||'');
   if(!username&&!password) return res.status(400).json({error:'Yangi login yoki parol kiriting.'});
   if(username&&(!/^[a-zA-Z0-9_]{3,20}$/.test(username)||!isCleanLogin(username))) return res.status(400).json({error:'Login 3–20 belgidan iborat bo‘lsin va odob qoidalariga mos bo‘lsin.'});
-  if(password&&password.length<6) return res.status(400).json({error:'Parol kamida 6 ta belgidan iborat bo‘lsin.'});
+  if(password&&password.length<8) return res.status(400).json({error:'Parol kamida 8 ta belgidan iborat bo‘lsin.'});
   const user=await users.findOne({id:payload.id});if(!user)return res.status(404).json({error:'Akkaunt topilmadi.'});
   if(username&&username.toLowerCase()!==user.lower&&await users.findOne({lower:username.toLowerCase()}))return res.status(409).json({error:'Bu login band.'});
-  const set={};if(username){set.username=username;set.lower=username.toLowerCase();}if(password)set.hash=bcrypt.hashSync(password,10);
+  const set={tokenVersion:Number(user.tokenVersion||0)+1};if(username){set.username=username;set.lower=username.toLowerCase();}if(password)set.hash=bcrypt.hashSync(password,10);
   await users.updateOne({id:user.id},{$set:set});
   res.json({ok:true,token:sign({...user,...set}),user:{username:set.username||user.username,role:user.role}});
 }));
 
+
+// Dars progressi va Gemini AI tomonidan bir marta yaratiladigan dars testi.
+async function generateLessonQuestions(course, episode) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY Render Environment bo‘limiga kiritilmagan.');
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const prompt = `Sen dasturlash kursi uchun pedagogik test tuzuvchisan.
+Kurs: ${course.title}
+Dars mavzusi: ${episode.title}
+Dars tavsifi: ${String(episode.description || course.description || '').slice(0,1800)}
+Aynan shu mavzuga mos 10 ta savol tuz. Har bir savolda 4 ta javob varianti bo‘lsin.
+Faqat JSON qaytar: {"questions":[{"text":"...","options":["...","...","...","..."],"correct":0,"explanation":"..."}]}
+correct 0 dan 3 gacha indeks. Savollar aniq, takrorlanmagan va mavzuga tegishli bo‘lsin.`;
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.35 } })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error?.message || 'Gemini AI test yarata olmadi.');
+  const raw = data.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
+  let parsed;
+  try { parsed = JSON.parse(raw.replace(/^```(?:json)?/i,'').replace(/```$/,'').trim()); }
+  catch { throw new Error('Gemini AI noto‘g‘ri JSON qaytardi.'); }
+  const questions = Array.isArray(parsed.questions) ? parsed.questions.slice(0,10) : [];
+  if (questions.length !== 10 || questions.some(q => !String(q.text || '').trim() || !Array.isArray(q.options) || q.options.length !== 4 || q.options.some(x => !String(x).trim()) || !Number.isInteger(q.correct) || q.correct < 0 || q.correct > 3)) {
+    throw new Error('Gemini AI test savollarini tekshirishdan o‘tkaza olmadi.');
+  }
+  return questions.map(q => ({ id: crypto.randomUUID(), text: String(q.text).slice(0,500), options: q.options.map(x => String(x).slice(0,200)), correct: q.correct, explanation: String(q.explanation || '').slice(0,500) }));
+}
+
+function mergeWatchRanges(existingRanges, start, end) {
+  const ranges = [...(Array.isArray(existingRanges) ? existingRanges : []), [Math.max(0, start), Math.max(0, end)]]
+    .filter(r => Array.isArray(r) && Number.isFinite(Number(r[0])) && Number.isFinite(Number(r[1])) && Number(r[1]) > Number(r[0]))
+    .map(r => [Number(r[0]), Number(r[1])]).sort((a,b) => a[0] - b[0]);
+  const merged = [];
+  for (const range of ranges) {
+    const last = merged[merged.length - 1];
+    if (!last || range[0] > last[1] + 0.25) merged.push(range);
+    else last[1] = Math.max(last[1], range[1]);
+  }
+  return merged;
+}
+app.post('/api/lessons/:courseId/:episodeId/watch', auth, actionRateLimit, wrap(async (req, res) => {
+  const { courseId, episodeId } = req.params;
+  const course = await animes.findOne({ id: courseId });
+  const episode = (course?.episodes || []).find(e => e.id === episodeId);
+  if (!course || !episode) return res.status(404).json({ error: 'Kurs yoki dars topilmadi.' });
+  if (episode.pro && !req.user.owner && req.user.role !== 'admin' && !req.user.pro) return res.status(403).json({ error: 'Bu dars faqat Pro obunachilar uchun.' });
+  const now = Date.now();
+  const key = { userId: req.user.id, courseId, episodeId };
+  const existing = await lessonProgress.findOne(key);
+  const duration = Number(episode.durationSeconds) || 0;
+  if (duration < 60) return res.status(409).json({ error: 'Bu dars videosining davomiyligi admin tomonidan sekundlarda sozlanishi kerak.' });
+  const mediaTime = Number(req.body.currentTime);
+  const safeMediaTime = Number.isFinite(mediaTime) && mediaTime >= 0 ? Math.min(mediaTime, duration) : null;
+  if (req.body.action === 'start' || !existing?.lastPingAt) {
+    await lessonProgress.updateOne(key, {
+      $set: { lastPingAt: now, lastMediaTime: safeMediaTime ?? Number(existing?.lastMediaTime || 0) },
+      $setOnInsert: { watchedSeconds: 0, watchedRanges: [], passed: false, created: now }
+    }, { upsert: true });
+  } else {
+    const last = Number(existing.lastPingAt || 0);
+    const elapsed = (now - last) / 1000;
+    const previousMedia = Number(existing.lastMediaTime || 0);
+    const delta = safeMediaTime === null ? 0 : safeMediaTime - previousMedia;
+    const canCount = elapsed >= 10 && elapsed <= 45 && req.body.playing === true &&
+      delta > 0 && delta <= elapsed * 2 + 3;
+    const update = { $set: { lastPingAt: now, ...(safeMediaTime === null ? {} : { lastMediaTime: safeMediaTime }) } };
+    if (canCount) {
+      const ranges = mergeWatchRanges(existing.watchedRanges, previousMedia, safeMediaTime);
+      const watchedSeconds = Math.min(duration, ranges.reduce((sum, r) => sum + (r[1] - r[0]), 0));
+      update.$set.watchedRanges = ranges;
+      update.$set.watchedSeconds = watchedSeconds;
+    }
+    await lessonProgress.updateOne({ ...key, lastPingAt: last }, update);
+  }
+  const state = await lessonProgress.findOne(key);
+  const watchedSeconds = Number(state?.watchedSeconds || 0);
+  res.json({ watchedSeconds, requiredSeconds: Math.ceil(duration * 0.9), ready: watchedSeconds >= Math.ceil(duration * 0.9), passed: !!state?.passed });
+}));
+app.get('/api/lessons/:courseId/:episodeId/test', auth, testRateLimit, wrap(async (req, res) => {
+  const { courseId, episodeId } = req.params;
+  const course = await animes.findOne({ id: courseId });
+  const episodes = (course?.episodes || []).slice().sort((a,b) => (a.order ?? 1e9) - (b.order ?? 1e9));
+  const index = episodes.findIndex(e => e.id === episodeId);
+  if (!course || index < 0) return res.status(404).json({ error: 'Kurs yoki dars topilmadi.' });
+  const episode = episodes[index];
+  if (episode.pro && !req.user.owner && req.user.role !== 'admin' && !req.user.pro) return res.status(403).json({ error: 'Bu dars faqat Pro obunachilar uchun.' });
+  if (index > 0) {
+    const previous = await lessonProgress.findOne({ userId: req.user.id, courseId, episodeId: episodes[index - 1].id, passed: true });
+    if (!previous) return res.status(403).json({ error: 'Avval oldingi darsni test bilan yakunlang.' });
+  }
+  const progress = await lessonProgress.findOne({ userId: req.user.id, courseId, episodeId });
+  const duration = Number(episode.durationSeconds) || 0;
+  if (duration < 60) return res.status(409).json({ error: 'Bu dars videosining davomiyligi admin tomonidan sekundlarda sozlanmagan.' });
+  if (!progress || Number(progress.watchedSeconds || 0) < Math.ceil(duration * 0.9)) {
+    return res.status(403).json({ error: 'Dars videosining kamida 90 foizini ko‘rganingizdan keyin test ochiladi.' });
+  }
+  let test = await tests.findOne({ lessonCourseId: courseId, lessonId: episodeId });
+  if (!test) {
+    let questions;
+    try { questions = await generateLessonQuestions(course, episode); }
+    catch (e) {
+      // Avval yaratilgan testlar AI ishlamasa ham bazadan beriladi; birinchi yaratish uchun API kaliti kerak.
+      return res.status(503).json({ error: e.message });
+    }
+    const doc = { id: crypto.randomUUID(), title: `${course.title} — ${episode.title}`, courseId, courseTitle: course.title, lessonCourseId: courseId, lessonId: episodeId, questions, passPercent: 80, active: true, created: Date.now(), generatedBy: 'gemini', version: 1 };
+    try { await tests.insertOne(doc); test = doc; }
+    catch (e) { if (e.code === 11000) test = await tests.findOne({ lessonCourseId: courseId, lessonId: episodeId }); else throw e; }
+  }
+  if (!test) return res.status(503).json({ error: 'Dars testi tayyorlanmadi. Keyinroq urinib ko‘ring.' });
+  res.json({ id: test.id, title: test.title, courseId, courseTitle: course.title, lessonId: episodeId, questions: (test.questions || []).map(q => ({ id: q.id, text: q.text, options: q.options })) });
+}));
+
 // Testlar: foydalanuvchilar faqat faol testlarni ko‘radi.
 app.get('/api/tests', auth, wrap(async (req, res) => {
-  const rows = await tests.find({ active: true }, { projection: { _id: 0, questions: 0 } }).sort({ created: -1 }).toArray();
+  const rows = await tests.find({ active: true, lessonId: { $exists: false } }, { projection: { _id: 0, questions: 0 } }).sort({ created: -1 }).toArray();
   res.json(rows);
 }));
-app.get('/api/tests/:id', auth, wrap(async (req, res) => {
+app.get('/api/tests/:id', auth, testRateLimit, wrap(async (req, res) => {
   const t = await tests.findOne({ id: req.params.id, active: true });
   if (!t) return res.status(404).json({ error: 'Test topilmadi.' });
-  res.json({ id: t.id, title: t.title, courseId: t.courseId, courseTitle: t.courseTitle, questions: (t.questions || []).map(q => ({ id: q.id, text: q.text, options: q.options })) });
+  if (t.lessonCourseId && t.lessonId) {
+    const course = await animes.findOne({ id: t.lessonCourseId });
+    const eps = (course?.episodes || []).slice().sort((a,b) => (a.order ?? 1e9) - (b.order ?? 1e9));
+    const index = eps.findIndex(e => e.id === t.lessonId);
+    const duration = Number(eps[index]?.durationSeconds) || 0;
+    if (duration < 60) return res.status(409).json({ error: 'Dars davomiyligi admin tomonidan sozlanmagan.' });
+    const progress = await lessonProgress.findOne({ userId: req.user.id, courseId: t.lessonCourseId, episodeId: t.lessonId });
+    if (index < 0 || !progress || Number(progress.watchedSeconds || 0) < Math.ceil(duration * 0.9)) return res.status(403).json({ error: 'Avval dars videosining 90 foizini ko‘ring.' });
+    if (index > 0 && !(await lessonProgress.findOne({ userId: req.user.id, courseId: t.lessonCourseId, episodeId: eps[index - 1].id, passed: true }))) return res.status(403).json({ error: 'Avvalgi dars testidan o‘ting.' });
+  }
+  res.json({ id: t.id, title: t.title, courseId: t.courseId, courseTitle: t.courseTitle, lessonId: t.lessonId || null, questions: (t.questions || []).map(q => ({ id: q.id, text: q.text, options: q.options })) });
 }));
-app.post('/api/tests/:id/submit', auth, wrap(async (req, res) => {
+app.post('/api/tests/:id/submit', auth, testRateLimit, wrap(async (req, res) => {
   const t = await tests.findOne({ id: req.params.id, active: true });
   if (!t) return res.status(404).json({ error: 'Test topilmadi.' });
-  const answers = req.body.answers || {};
-  let correct = 0;
-  for (const q of (t.questions || [])) if (Number(answers[q.id]) === Number(q.correct)) correct++;
-  const total = (t.questions || []).length;
+  const questions = Array.isArray(t.questions) ? t.questions : [];
+  const answers = req.body.answers && typeof req.body.answers === 'object' && !Array.isArray(req.body.answers) ? req.body.answers : {};
+  const total = questions.length;
   if (!total) return res.status(400).json({ error: 'Test savollari mavjud emas.' });
-  const percent = Math.round(correct / total * 100), passed = percent >= (t.passPercent || 70);
-  const learner = await users.findOne({ id: req.user.id });
-  const firstPass = passed && !(learner.xpAwards || []).includes('test:' + t.id);
-  const update = { $push: { testResults: { $each: [{ testId: t.id, percent, passed, at: Date.now() }], $slice: -50 } } };
-  if (firstPass) { update.$inc = { xp: 30 }; update.$addToSet = { xpAwards: 'test:' + t.id }; }
-  await users.updateOne({ id: req.user.id }, update);
-  res.json({ correct, total, percent, passed, xpEarned: firstPass ? 30 : 0, testId: t.id, courseId: t.courseId, courseTitle: t.courseTitle, required: t.passPercent || 70 });
+
+  // Lesson testlari faqat tegishli darsning 90% kuzatuv va oldingi dars testidan keyin ochiladi.
+  if (t.lessonCourseId && t.lessonId) {
+    const progress = await lessonProgress.findOne({ userId: req.user.id, courseId: t.lessonCourseId, episodeId: t.lessonId });
+    const course = await animes.findOne({ id: t.lessonCourseId });
+    const episodeList = (course?.episodes || []).slice().sort((a,b) => (a.order ?? 1e9) - (b.order ?? 1e9));
+    const index = episodeList.findIndex(e => e.id === t.lessonId);
+    const duration = Number(episodeList[index]?.durationSeconds) || 0;
+    if (duration < 60) return res.status(409).json({ error: 'Dars davomiyligi admin tomonidan sozlanmagan.' });
+    if (!progress || Number(progress.watchedSeconds || 0) < Math.ceil(duration * 0.9)) {
+      return res.status(403).json({ error: 'Test ochilishi uchun dars videosining kamida 90 foizini ko‘rishingiz kerak.' });
+    }
+    if (index > 0) {
+      const previous = await lessonProgress.findOne({ userId: req.user.id, courseId: t.lessonCourseId, episodeId: episodeList[index - 1].id, passed: true });
+      if (!previous) return res.status(403).json({ error: 'Avvalgi dars testidan o‘tmaguningizcha bu test ochilmaydi.' });
+    }
+  }
+
+  const day = new Date().toISOString().slice(0,10);
+  const attemptNo = await testAttempts.countDocuments({ userId: req.user.id, testId: t.id, day });
+  if (attemptNo >= 5) return res.status(429).json({ error: 'Bu test uchun bugungi 5 ta urinishdan foydalandingiz. Ertaga qayta urinib ko‘ring.' });
+  try {
+    await testAttempts.insertOne({ id: crypto.randomUUID(), userId: req.user.id, testId: t.id, day, attemptNo: attemptNo + 1, created: new Date() });
+  } catch (e) {
+    if (e.code === 11000) return res.status(429).json({ error: 'Test urinish limiti tugadi. Birozdan keyin qayta urinib ko‘ring.' });
+    throw e;
+  }
+
+  let correct = 0;
+  for (const q of questions) {
+    const answer = answers[q.id];
+    const validAnswer = Number.isInteger(answer) || (typeof answer === 'string' && /^(0|1|2|3)$/.test(answer));
+    if (validAnswer && Number(answer) === Number(q.correct)) correct++;
+  }
+  const percent = Math.round(correct / total * 100);
+  const required = t.lessonCourseId ? 80 : (t.passPercent || 70);
+  const passed = percent >= required;
+  const now = Date.now();
+  await users.updateOne({ id: req.user.id }, { $push: { testResults: { $each: [{ testId: t.id, percent, passed, at: now }], $slice: -50 } } });
+
+  let xpEarned = 0;
+  if (passed) {
+    const award = await users.updateOne(
+      { id: req.user.id, xpAwards: { $ne: 'test:' + t.id } },
+      { $inc: { xp: 30 }, $addToSet: { xpAwards: 'test:' + t.id } }
+    );
+    if (award.modifiedCount) xpEarned = 30;
+  }
+  let courseCompleted = false;
+  if (t.lessonCourseId && t.lessonId) {
+    await lessonProgress.updateOne(
+      { userId: req.user.id, courseId: t.lessonCourseId, episodeId: t.lessonId },
+      { $set: { passed, lastPercent: percent, testedAt: now }, $setOnInsert: { watchedSeconds: 0, created: now } },
+      { upsert: true }
+    );
+    const course = await animes.findOne({ id: t.lessonCourseId });
+    const lessonIds = (course?.episodes || []).map(e => e.id);
+    const passedCount = await lessonProgress.countDocuments({ userId: req.user.id, courseId: t.lessonCourseId, episodeId: { $in: lessonIds }, passed: true });
+    courseCompleted = lessonIds.length > 0 && passedCount === lessonIds.length;
+  }
+  res.json({ correct, total, percent, passed, xpEarned, testId: t.id, courseId: t.courseId, courseTitle: t.courseTitle, required, courseCompleted, attemptsLeft: Math.max(0, 5 - attemptNo - 1) });
 }));
 app.get('/api/admin/tests', auth, mainAdminOnly, wrap(async (req, res) => {
   res.json(await tests.find({}, { projection: { _id: 0 } }).sort({ created: -1 }).toArray());
@@ -454,22 +868,69 @@ app.put('/api/admin/tests/:id', auth, mainAdminOnly, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 app.delete('/api/admin/tests/:id', auth, mainAdminOnly, wrap(async (req, res) => { await tests.deleteOne({ id: req.params.id }); res.json({ ok: true }); }));
-app.delete('/api/certificates/:id', auth, wrap(async (req, res) => {
-  const certificateId = String(req.params.id || '');
-  const result = await users.updateOne({ id: req.user.id }, { $pull: { certificates: { id: certificateId } } });
-  if (!result.modifiedCount) return res.status(404).json({ error: 'Sertifikat topilmadi yoki avval o‘chirilgan.' });
-  res.json({ ok: true });
+app.get('/api/certificates/verify/:id', wrap(async (req, res) => {
+  const id = String(req.params.id || '').toUpperCase();
+  if (!/^(?:SM-[A-F0-9]{12}|DK-[A-F0-9]{10})$/.test(id)) return res.status(400).json({ valid: false, error: 'Sertifikat raqami formati noto‘g‘ri.' });
+  const cert = await certificates.findOne({ id }, { projection: { _id: 0, userId: 0 } });
+  if (!cert) return res.status(404).json({ valid: false, error: 'Bunday sertifikat topilmadi.' });
+  res.json({ valid: true, certificate: cert });
 }));
-app.post('/api/certificates', auth, wrap(async (req, res) => {
-  const testId = String(req.body.testId || '');
-  const t = await tests.findOne({ id: testId, active: true });
+app.get('/verify/:id', wrap(async (req, res) => {
+  const id = String(req.params.id || '').toUpperCase();
+  const cert = await certificates.findOne({ id }, { projection: { _id: 0, userId: 0, testId: 0 } });
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  if (!cert) return res.status(404).type('html').send(`<!doctype html><meta charset="utf-8"><title>Sertifikat tekshiruvi</title><h1>Sertifikat topilmadi</h1><p>${esc(id)}</p>`);
+  res.type('html').send(`<!doctype html><html lang="uz"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sertifikat ${esc(cert.id)}</title><style>body{font:16px system-ui;background:#0b1220;color:#eef4ff;display:grid;place-items:center;min-height:100vh;margin:0}.card{max-width:620px;margin:24px;padding:32px;border:1px solid #45618b;border-radius:20px;background:#142139}h1{color:#79d6a7}.id{font:700 22px monospace;color:#8ec5ff}</style><main class="card"><h1>✓ Sertifikat haqiqiy</h1><p class="id">${esc(cert.id)}</p><h2>${esc(cert.fullName)}</h2><p>Kurs: <b>${esc(cert.courseTitle)}</b></p><p>Natija: ${esc(cert.percent)}%</p><p>Berilgan sana: ${esc(new Date(cert.created).toLocaleDateString('uz-UZ'))}</p><p>Created by Sobirov · Dasturlash Kursi</p></main></html>`);
+}));
+
+app.post('/api/certificates', auth, actionRateLimit, wrap(async (req, res) => {
   const user = await users.findOne({ id: req.user.id });
-  const attempt = (user.testResults || []).filter(x => x.testId === testId && x.passed && x.percent >= (t?.passPercent || 70)).sort((a,b) => b.at - a.at)[0];
+  if (!user) return res.status(404).json({ error: 'Foydalanuvchi topilmadi.' });
   const fullName = String(user.profileName || '').trim();
-  if (!t || !attempt || !fullName || !/^[\p{L}\p{M} .\-\u0027\u2018\u2019\u02BB\u02BC]{2,80}$/u.test(fullName)) return res.status(400).json({ error: 'Sertifikat uchun profilingizda ism-familiya saqlangan bo‘lishi va testdan o‘tgan bo‘lishingiz kerak.' });
-  const cert = { id: 'DK-' + crypto.randomBytes(5).toString('hex').toUpperCase(), fullName, courseTitle: t.courseTitle, issuer: 'Sobirov Muhammadumar', percent: attempt.percent, created: Date.now() };
-  await users.updateOne({ id: req.user.id }, { $push: { certificates: { $each: [cert], $slice: -30 } } });
-  res.json(cert);
+  if (!fullName || !/^[\p{L}\p{M} .\-\u0027\u2018\u2019\u02BB\u02BC]{2,80}$/u.test(fullName)) {
+    return res.status(400).json({ error: 'Sertifikat uchun profilingizda haqiqiy ism-familiyangizni saqlang.' });
+  }
+  let testId = String(req.body.testId || '');
+  let courseTitle = '';
+  let percent = 100;
+  if (req.body.courseId) {
+    const course = await animes.findOne({ id: String(req.body.courseId) });
+    if (!course) return res.status(404).json({ error: 'Kurs topilmadi.' });
+    const ids = (course.episodes || []).map(e => e.id);
+    if (!ids.length) return res.status(400).json({ error: 'Kursda yakunlanadigan darslar mavjud emas.' });
+    const done = await lessonProgress.countDocuments({ userId: user.id, courseId: course.id, episodeId: { $in: ids }, passed: true });
+    if (done !== ids.length) return res.status(403).json({ error: 'Sertifikat olish uchun kursdagi barcha dars testlaridan o‘ting.' });
+    testId = 'course:' + course.id;
+    courseTitle = course.title;
+  } else {
+    const t = await tests.findOne({ id: testId, active: true, lessonId: { $exists: false } });
+    const attempt = (user.testResults || []).filter(x => x.testId === testId && x.passed && x.percent >= (t?.passPercent || 70)).sort((a,b) => b.at - a.at)[0];
+    if (!t || !attempt) return res.status(400).json({ error: 'Sertifikat uchun testdan muvaffaqiyatli o‘tgan bo‘lishingiz kerak.' });
+    courseTitle = t.courseTitle || 'Dasturlash kursi';
+    percent = attempt.percent;
+  }
+  const existing = await certificates.findOne({ userId: user.id, testId });
+  if (existing) return res.json({ ...existing, _id: undefined, userId: undefined });
+  const certId = 'SM-' + crypto.randomBytes(6).toString('hex').toUpperCase();
+  const publicBase = String(process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  const cert = {
+    id: certId, userId: user.id, testId, fullName, courseTitle,
+    issuer: 'Sobirov Muhammadumar', percent,
+    created: Date.now(), verified: true,
+    verifyUrl: `${publicBase}/verify/${certId}`
+  };
+  try { await certificates.insertOne(cert); }
+  catch (e) {
+    if (e.code === 11000) {
+      const duplicate = await certificates.findOne({ userId: user.id, testId });
+      if (duplicate) return res.json({ ...duplicate, _id: undefined, userId: undefined });
+    }
+    throw e;
+  }
+  // Eski frontend va eksportlar bilan moslik uchun nusxa; rasmiy manba certificates kolleksiyasi.
+  await users.updateOne({ id: user.id }, { $addToSet: { certificates: { id: cert.id, fullName: cert.fullName, courseTitle: cert.courseTitle, issuer: cert.issuer, percent: cert.percent, created: cert.created } } });
+  const { userId, testId: ignored, ...publicCert } = cert;
+  res.json(publicCert);
 }));
 app.put('/api/anime/:id', auth, mainAdminOnly, wrap(async (req, res) => {
   const b = req.body;
@@ -495,7 +956,7 @@ app.put('/api/anime/:id', auth, mainAdminOnly, wrap(async (req, res) => {
       if (!eps[0].title) eps[0].title = '1-qism';
       if (eps[0].order == null) eps[0].order = 1;
     } else {
-      eps.push({ id: crypto.randomUUID(), title: '1-qism', video: set.video, order: 1, pro: !!b.videoPro, views: 0 });
+      eps.push({ id: crypto.randomUUID(), title: '1-qism', video: set.video, order: 1, pro: !!b.videoPro, durationSeconds: 0, views: 0 });
     }
   } else if (eps.length && eps[0].title === '1-qism') {
     eps.shift();
@@ -591,7 +1052,7 @@ app.get('/api/anime/:id/reactions', auth, wrap(async (req, res) => {
   }
   res.json(out);
 }));
-app.post('/api/anime/:id/react', auth, wrap(async (req, res) => {
+app.post('/api/anime/:id/react', auth, actionRateLimit, wrap(async (req, res) => {
   const v = Math.sign(Number(req.body.v)) || 0;
   const f = { animeId: req.params.id, ep: String(req.body.ep || 'main'), userId: req.user.id };
   if (v === 0) await reactions.deleteOne(f); else await reactions.updateOne(f, { $set: { v } }, { upsert: true });
@@ -620,7 +1081,7 @@ app.get('/api/community', auth, wrap(async (req, res) => {
   const rows = await community.find({}, { projection: { _id: 0 } }).sort({ created: -1 }).limit(60).toArray();
   res.json(rows);
 }));
-app.post('/api/community', auth, wrap(async (req, res) => {
+app.post('/api/community', auth, commentRateLimit, wrap(async (req, res) => {
   const body = String(req.body.text || '').trim().slice(0, 1200);
   if (body.length < 3) return res.status(400).json({ error: 'Xabar kamida 3 ta belgidan iborat bo‘lsin.' });
   const post = { id: crypto.randomUUID(), userId: req.user.id, username: req.user.username, name: String((await users.findOne({ id: req.user.id }))?.profileName || req.user.username), text: body, created: Date.now() };
@@ -635,8 +1096,97 @@ app.delete('/api/community/:id', auth, wrap(async (req, res) => {
 }));
 app.get('/api/roadmap', auth, wrap(async (req, res) => {
   const courses = await animes.find({}, { projection: { _id: 0, id: 1, title: 1, genre: 1, description: 1, episodes: 1 } }).sort({ created: 1 }).toArray();
-  const u = await users.findOne({ id: req.user.id }); const done = new Set(u.watchedEpisodes || []);
+  const done = new Set((await lessonProgress.find({ userId: req.user.id, passed: true }).toArray()).map(p => p.courseId + ':' + p.episodeId));
   res.json(courses.map((c, i) => ({ id: c.id, title: c.title, genre: c.genre || '', description: c.description || '', order: i + 1, lessons: (c.episodes || []).map(e => ({ id: e.id, title: e.title, done: done.has(c.id + ':' + e.id) })) })));
+}));
+
+
+// Gemini AI: kundalik topshiriq, kod tahlili va foydalanuvchi tarixi.
+async function geminiText(prompt, maxOutputTokens = 1800) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY Render Environment bo‘limiga kiritilmagan.');
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.35, maxOutputTokens } })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error?.message || 'Gemini AI bilan bog‘lanib bo‘lmadi.');
+  const text = data.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim();
+  if (!text) throw new Error('Gemini AI bo‘sh javob qaytardi.');
+  return text;
+}
+app.get('/api/ai/history', auth, wrap(async (req, res) => {
+  const rows = await aiHistory.find({ userId: req.user.id }, { projection: { _id: 0, userId: 0 } }).sort({ created: -1 }).limit(30).toArray();
+  res.json(rows);
+}));
+app.post('/api/ai/daily-task', auth, testRateLimit, wrap(async (req, res) => {
+  const day = new Date().toISOString().slice(0,10);
+  const existing = await aiHistory.findOne({ userId: req.user.id, type: 'daily_task', day });
+  if (existing) return res.json({ id: existing.id, day, task: existing.task, cached: true });
+  const user = await users.findOne({ id: req.user.id });
+  const prompt = `O‘zbek tilida dasturlashni o‘rganuvchi uchun bitta kundalik amaliy topshiriq tuz.
+Foydalanuvchi profili: ${user?.profileName || user?.username || 'O‘quvchi'}.
+Qisqa, bajariladigan va tushunarli bo‘lsin. Faqat JSON: {"title":"...","description":"...","language":"JavaScript","starterCode":"...","criteria":["...","..."]}`;
+  const raw = await geminiText(prompt, 1200);
+  let task;
+  try { task = JSON.parse(raw.replace(/^```(?:json)?/i,'').replace(/```$/,'').trim()); }
+  catch { throw new Error('AI topshiriq formatini tekshirib bo‘lmadi. Qayta urinib ko‘ring.'); }
+  if (!task.title || !task.description) throw new Error('AI topshiriq ma’lumoti to‘liq emas.');
+  const doc = { id: crypto.randomUUID(), userId: req.user.id, type: 'daily_task', day, task, created: Date.now() };
+  try { await aiHistory.insertOne(doc); }
+  catch (e) {
+    if (e.code === 11000) {
+      const concurrent = await aiHistory.findOne({ userId: req.user.id, type: 'daily_task', day });
+      if (concurrent) return res.json({ id: concurrent.id, day, task: concurrent.task, cached: true });
+    }
+    throw e;
+  }
+  res.json({ id: doc.id, day, task, cached: false });
+}));
+app.post('/api/ai/daily-task/submit', auth, testRateLimit, wrap(async (req, res) => {
+  const id = String(req.body.id || '');
+  const answer = String(req.body.answer || '').slice(0,12000);
+  if (!id || answer.trim().length < 10) return res.status(400).json({ error: 'Topshiriq javobini to‘liq yuboring.' });
+  const task = await aiHistory.findOne({ id, userId: req.user.id, type: 'daily_task' });
+  if (!task) return res.status(404).json({ error: 'Bugungi topshiriq topilmadi.' });
+  if (task.completed) {
+    const recoveredAward = await users.updateOne({ id: req.user.id, aiDailyAwards: { $ne: task.day } }, { $inc: { xp: 20 }, $addToSet: { aiDailyAwards: task.day } });
+    return res.json({ completed: true, evaluation: task.evaluation, xpEarned: recoveredAward.modifiedCount ? 20 : 0 });
+  }
+  const evaluationText = await geminiText(`Quyidagi dasturlash topshirig‘ini bahola. Foydalanuvchi yechimi talabga mos, ishlashga yaroqli va mazmunan to‘g‘rimi? Faqat JSON qaytar: {"passed":true/false,"score":0-100,"feedback":"o‘zbekcha izoh"}.
+TOPSHIRIQ: ${JSON.stringify(task.task)}
+YECHIM:
+${answer}`, 1000);
+  let evaluation;
+  try { evaluation = JSON.parse(evaluationText.replace(/^```(?:json)?/i,'').replace(/```$/,'').trim()); }
+  catch { throw new Error('AI tekshiruv natijasini o‘qib bo‘lmadi. Qayta urinib ko‘ring.'); }
+  const passed = evaluation.passed === true && Number(evaluation.score) >= 70;
+  await aiHistory.updateOne({ id, userId: req.user.id, completed: { $ne: true } }, { $set: { completed: passed, evaluation: { passed, score: Number(evaluation.score) || 0, feedback: String(evaluation.feedback || '').slice(0,1200) }, submittedAt: Date.now() } });
+  let xpEarned = 0;
+  if (passed) {
+    const award = await users.updateOne({ id: req.user.id, aiDailyAwards: { $ne: task.day } }, { $inc: { xp: 20 }, $addToSet: { aiDailyAwards: task.day } });
+    if (award.modifiedCount) xpEarned = 20;
+  }
+  res.json({ completed: passed, evaluation, xpEarned });
+}));
+
+app.post('/api/ai/chat', auth, testRateLimit, wrap(async (req, res) => {
+  const message = String(req.body.message || '').trim().slice(0,3000);
+  if (!message) return res.status(400).json({ error: 'Savolingizni yozing.' });
+  const answer = await geminiText(`Sen Dasturlash Kursi platformasidagi o‘zbek tilida javob beradigan dasturlash ustozisan. Javobni tushunarli, aniq va bosqichma-bosqich yoz. Kerak bo‘lsa kod misoli keltir. Foydalanuvchi savoli: ${message}`, 1800);
+  const doc = { id: crypto.randomUUID(), userId: req.user.id, type: 'chat', message, answer, created: Date.now() };
+  await aiHistory.insertOne(doc);
+  res.json({ id: doc.id, answer });
+}));
+app.post('/api/ai/code-review', auth, testRateLimit, wrap(async (req, res) => {
+  const language = String(req.body.language || 'JavaScript').slice(0,40);
+  const code = String(req.body.code || '').slice(0,12000);
+  if (!code.trim()) return res.status(400).json({ error: 'Tekshirish uchun kod kiriting.' });
+  const review = await geminiText(`Sen tajribali dasturlash ustozisan. Quyidagi ${language} kodni o‘zbek tilida tahlil qil: xatolar, xavfsizlik muammolari, ishlash sifati va aniq yaxshilash tavsiyalari. Kodni o‘zingcha bajarilgan deb ko‘rsatma. Kod:\n${code}`, 2200);
+  const doc = { id: crypto.randomUUID(), userId: req.user.id, type: 'code_review', language, code, review, created: Date.now() };
+  await aiHistory.insertOne(doc);
+  res.json({ id: doc.id, review });
 }));
 
 // Pro obuna (faqat bosh admin beradi) va promo kodlar
@@ -666,7 +1216,7 @@ app.delete('/api/admin/promos/:id', auth, mainAdminOnly, wrap(async (req, res) =
   await promos.deleteOne({ id: req.params.id });
   res.json({ ok: true });
 }));
-app.post('/api/promo/redeem', auth, wrap(async (req, res) => {
+app.post('/api/promo/redeem', auth, actionRateLimit, wrap(async (req, res) => {
   const code = String(req.body.code || '').trim().toUpperCase();
   const p = await promos.findOneAndUpdate(
     { code, usedBy: { $ne: req.user.id }, $expr: { $lt: ['$used', '$maxUses'] } },
@@ -712,9 +1262,48 @@ app.delete('/api/admin/plans/:id', auth, mainAdminOnly, wrap(async (req, res) =>
 
 // To'lov so'rovlari bot orqali ko'rib chiqiladi; promo kod faqat admin tasdiqlagach beriladi.
 
+
+app.post('/api/admin/backup', auth, ownerOnly, actionRateLimit, wrap(async (req, res) => {
+  const backupUri = process.env.BACKUP_MONGODB_URI;
+  if (!backupUri) return res.status(503).json({ error: 'Zaxira nusxa uchun BACKUP_MONGODB_URI Render Environment bo‘limiga kiritilishi kerak.' });
+  const backupClient = new MongoClient(backupUri);
+  const backupId = new Date().toISOString().replace(/[:.]/g, '-');
+  try {
+    await backupClient.connect();
+    const target = backupClient.db('animexona_backup');
+    const names = (await database.listCollections({}, { nameOnly: true }).toArray()).map(x => x.name);
+    let total = 0;
+    for (const name of names) {
+      const source = database.collection(name);
+      const destination = target.collection('snapshot_' + name);
+      await destination.deleteMany({ backupId });
+      const cursor = source.find({}).batchSize(250);
+      let batch = [];
+      for await (const doc of cursor) {
+        batch.push({ backupId, document: doc });
+        if (batch.length >= 250) {
+          await destination.insertMany(batch, { ordered: false });
+          total += batch.length; batch = [];
+        }
+      }
+      if (batch.length) { await destination.insertMany(batch, { ordered: false }); total += batch.length; }
+    }
+    await target.collection('backupRuns').insertOne({ backupId, created: Date.now(), collections: names, documents: total, by: req.user.id });
+    const oldRuns = await target.collection('backupRuns').find({}).sort({ created: -1 }).skip(7).toArray();
+    for (const old of oldRuns) {
+      for (const name of old.collections || []) await target.collection('snapshot_' + name).deleteMany({ backupId: old.backupId });
+      await target.collection('backupRuns').deleteOne({ backupId: old.backupId });
+    }
+    res.json({ ok: true, backupId, collections: names.length, documents: total });
+  } finally {
+    await backupClient.close().catch(() => {});
+  }
+}));
+
 // Telegram bot: uch darajali admin, Pro to'lovlari va anonim murojaatlar.
 let telegramOffset = 0;
 let telegramPolling = false;
+let telegramWebhookActive = false;
 // Adminlar botga odatiy foydalanuvchi sifatida kiradi; /adminpanel bilan admin rejimini yoqadi.
 // Bu holat xotirada saqlanadi va server qayta ishga tushganda xavfsizlik uchun o'chadi.
 const adminPanelChats = new Set();
@@ -729,6 +1318,24 @@ async function telegramApi(method, payload) {
   return data.result;
 }
 async function telegramSend(chatId, text, extra = {}) { return telegramApi('sendMessage', { chat_id: chatId, text, ...extra }); }
+
+app.post('/api/telegram/webhook', wrap(async (req, res) => {
+  if (!WEBHOOK_ENABLED) return res.status(503).json({ error: 'Telegram webhook sozlanmagan.' });
+  const supplied = Buffer.from(String(req.get('X-Telegram-Bot-Api-Secret-Token') || ''), 'utf8');
+  const expected = Buffer.from(process.env.TELEGRAM_WEBHOOK_SECRET, 'utf8');
+  if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) {
+    return res.status(403).json({ error: 'Webhook secret noto‘g‘ri.' });
+  }
+  const updateId = Number(req.body?.update_id);
+  if (!Number.isSafeInteger(updateId) || updateId < 0) return res.status(400).json({ error: 'Telegram update formati noto‘g‘ri.' });
+  await telegramWebhookQueue.updateOne(
+    { updateId },
+    { $setOnInsert: { updateId, update: req.body, status: 'queued', created: new Date() } },
+    { upsert: true }
+  );
+  res.status(200).json({ ok: true });
+}));
+
 function displayTelegramUser(from) { return from.username ? '@' + from.username : (from.first_name || 'Telegram foydalanuvchisi'); }
 async function adminInfo(chatId) {
   if (ADMIN_TELEGRAM_ID && String(chatId) === ADMIN_TELEGRAM_ID) return { level: 'owner', label: 'Owner' };
@@ -775,13 +1382,8 @@ async function showStats(chatId) {
   const paymentsPending = await payments.countDocuments({ status: 'pending' });
   await telegramSend(chatId, `📊 Bot statistikasi\n\n👥 Foydalanuvchilar: ${total}\n🛡 Adminlar: ${admins}\n⏳ Tasdiqlash kutilmoqda: ${pending}\n🧾 Tekshiriladigan to‘lovlar: ${paymentsPending}`);
 }
-async function pollTelegram() {
-  if (!TELEGRAM_BOT_TOKEN || telegramPolling) return;
-  telegramPolling = true;
-  try {
-    const r = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?timeout=25&offset=${telegramOffset}`);
-    const data = await r.json();
-    if (data.ok && Array.isArray(data.result)) for (const update of data.result) {
+async function processTelegramUpdates(updates) {
+  for (const update of updates) {
       telegramOffset = update.update_id + 1;
       if (update.callback_query) {
         const q = update.callback_query, chatId = String(q.message?.chat?.id || ''), role = await adminInfo(chatId);
@@ -815,9 +1417,15 @@ async function pollTelegram() {
             const result = await payments.updateOne({ id: paymentId, status: { $in: ['pending', 'activation_error'] } }, { $set: { status: 'activating', reviewed: Date.now(), reviewedBy: chatId, userId: paidUser.id, siteUserId: paidUser.id, username: paidUser.username } });
             if (!result.modifiedCount) { await telegramApi('answerCallbackQuery', { callback_query_id: q.id, text: 'Boshqa admin avval ko‘rib chiqdi.' }); continue; }
             const startFrom = Math.max(Date.now(), Number(paidUser.proUntil || 0));
-            const proUntil = startFrom + days * 24 * 60 * 60 * 1000;
-            await users.updateOne({ id: paidUser.id }, { $set: { proUntil } });
-            await payments.updateOne({ id: paymentId }, { $set: { status: 'approved', proActivated: true, proUntil } });
+            const proposedUntil = startFrom + days * 24 * 60 * 60 * 1000;
+            const applied = await users.updateOne(
+              { id: paidUser.id, processedPayments: { $ne: paymentId } },
+              { $set: { proUntil: proposedUntil }, $addToSet: { processedPayments: paymentId } }
+            );
+            // Server qayta ishga tushib, payment activation_error bo‘lsa, Pro muddati ikkinchi marta qo‘shilmaydi.
+            const refreshedUser = await users.findOne({ id: paidUser.id });
+            const proUntil = applied.modifiedCount ? proposedUntil : Number(refreshedUser?.proUntil || proposedUntil);
+            await payments.updateOne({ id: paymentId, status: 'activating' }, { $set: { status: 'approved', proActivated: true, proUntil } });
             await telegramSend(payment.chatId, `✅ To‘lovingiz tasdiqlandi va Pro obuna faollashtirildi!\n\nSayt akkaunti: ${paidUser.username}\nSayt ID: ${paidUser.id}\nTarif: ${payment.planName}\nMuddat: ${days} kun\nAmal qilish muddati: ${new Date(proUntil).toLocaleDateString('uz-UZ')}\n\nSaytga aynan ${paidUser.username} akkaunti orqali kiring va sahifani yangilang.`, { reply_markup: USER_MENU });
             await logAdmin(chatId, 'payment_approved', paymentId);
           } else {
@@ -952,15 +1560,43 @@ async function pollTelegram() {
       if (contactState && !isAdmin) { const reviewers = await activeAdmins(true); if (!reviewers.length) { await telegramSend(chatId, 'Hozircha admin manzili sozlanmagan.'); continue; } let sent = 0; for (const reviewer of reviewers) { try { const f = await telegramSend(reviewer, `📩 Yangi anonim murojaat\nFoydalanuvchi: ${displayTelegramUser(msg.from || {})}\nChat ID: ${chatId}\n\nXabar:\n${text}\n\nJavob berish uchun shu xabarga Reply qiling.`); await botReplies.insertOne({ adminMessageId: f.message_id, userChatId: chatId, created: Date.now() }); sent++; } catch (e) { console.error('Murojaat yuborilmadi:', e.message); } } await botReplies.updateOne({ userChatId: chatId }, { $set: { waitingForMessage: false, updated: Date.now() } }); await telegramSend(chatId, `✅ Xabaringiz ${sent} ta admin chatiga yuborildi. Javob shu bot orqali keladi.`, { reply_markup: USER_MENU }); continue; }
       if (isAdmin) await telegramSend(chatId, `Sizning darajangiz: ${role.level === 'owner' ? 'Owner' : role.level === 'main' ? 'Main Admin' : 'Oddiy Admin'}. Menyudan bo‘lim tanlang.`, { reply_markup: menuFor(role) });
       else await telegramSend(chatId, 'Menyudan kerakli bo‘limni tanlang.', { reply_markup: USER_MENU });
+  }
+}
+
+async function pollTelegram() {
+  if (!TELEGRAM_BOT_TOKEN || telegramPolling) return;
+  telegramPolling = true;
+  try {
+    if (telegramWebhookActive) {
+      const queued = await telegramWebhookQueue.findOneAndUpdate(
+        { status: 'queued' },
+        { $set: { status: 'processing', started: Date.now() } },
+        { sort: { created: 1 }, returnDocument: 'after' }
+      );
+      if (queued) {
+        try {
+          await processTelegramUpdates([queued.update]);
+          await telegramWebhookQueue.updateOne({ updateId: queued.updateId, status: 'processing' }, { $set: { status: 'processed', processedAt: Date.now() } });
+        } catch (error) {
+          await telegramWebhookQueue.updateOne({ updateId: queued.updateId }, { $set: { status: 'queued', lastError: String(error.message || error).slice(0,300) } });
+          throw error;
+        }
+      }
+    } else {
+      const r = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?timeout=25&offset=${telegramOffset}`);
+      const data = await r.json();
+      if (data.ok && Array.isArray(data.result)) await processTelegramUpdates(data.result);
     }
   } catch (e) { console.error('Telegram bot:', e.message); }
   finally { telegramPolling = false; setTimeout(pollTelegram, 1000); }
 }
 
+
 (async () => {
   const client = new MongoClient(MONGODB_URI);
   await client.connect();
   const db = client.db('animexona');
+  database = db;
   users = db.collection('users');
   animes = db.collection('anime');
   comments = db.collection('comments');
@@ -976,15 +1612,30 @@ async function pollTelegram() {
   await pendingRecoveries.createIndex({ nonce: 1 }, { unique: true });
   await pendingRecoveries.createIndex({ expires: 1 }, { expireAfterSeconds: 0 });
   tests = db.collection('tests');
+  certificates = db.collection('certificates');
+  testAttempts = db.collection('testAttempts');
+  lessonProgress = db.collection('lessonProgress');
+  aiHistory = db.collection('aiHistory');
   community = db.collection('community');
   await community.createIndex({ created: -1 });
   await community.createIndex({ id: 1 }, { unique: true });
+  await certificates.createIndex({ id: 1 }, { unique: true });
+  await certificates.createIndex({ userId: 1, testId: 1 }, { unique: true });
+  await certificates.createIndex({ created: -1 });
+  await testAttempts.createIndex({ userId: 1, testId: 1, day: 1, attemptNo: 1 }, { unique: true });
+  await testAttempts.createIndex({ created: -1 });
+  await testAttempts.createIndex({ created: 1 }, { expireAfterSeconds: 60 * 24 * 60 * 60 });
+  await lessonProgress.createIndex({ userId: 1, courseId: 1, episodeId: 1 }, { unique: true });
+  await aiHistory.createIndex({ userId: 1, created: -1 });
+  await aiHistory.createIndex({ userId: 1, type: 1, day: 1 }, { unique: true, partialFilterExpression: { type: 'daily_task' } });
+  await tests.createIndex({ lessonCourseId: 1, lessonId: 1 }, { unique: true, sparse: true });
   botReplies = db.collection('botReplies');
   payments = db.collection('payments');
   botSettings = db.collection('botSettings');
   telegramAdmins = db.collection('telegramAdmins');
   blockedUsers = db.collection('blockedUsers');
   adminLogs = db.collection('adminLogs');
+  telegramWebhookQueue = db.collection('telegramWebhookQueue');
   await pendingRegs.createIndex({ nonce: 1 }, { unique: true });
   await botReplies.createIndex({ adminMessageId: 1 });
   await botReplies.createIndex({ userChatId: 1 });
@@ -992,6 +1643,10 @@ async function pollTelegram() {
   await telegramAdmins.createIndex({ chatId: 1 }, { unique: true });
   await blockedUsers.createIndex({ chatId: 1 }, { unique: true });
   await adminLogs.createIndex({ created: -1 });
+  await telegramWebhookQueue.createIndex({ updateId: 1 }, { unique: true });
+  await telegramWebhookQueue.createIndex({ status: 1, created: 1 });
+  await telegramWebhookQueue.createIndex({ created: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+  await telegramWebhookQueue.updateMany({ status: 'processing' }, { $set: { status: 'queued' } });
   await payments.createIndex({ chatId: 1, status:  1, created: -1 });
   await promos.createIndex({ code: 1 }, { unique: true });
   await genres.createIndex({ lower: 1 }, { unique: true });
@@ -1008,15 +1663,54 @@ async function pollTelegram() {
       await genres.updateOne({ lower: n.toLowerCase() }, { $setOnInsert: { id: crypto.randomUUID(), name: n, lower: n.toLowerCase() } }, { upsert: true });
   }
   await users.createIndex({ lower: 1 }, { unique: true });
-  // Admin akaunt har ishga tushganda tekshiriladi (parol o'zgarsa yangilanadi)
+  // Eski formatdagi asosiy videosi bor, lekin episodes massivi bo‘lmagan kurslarni 1-dars sifatida moslaymiz.
+  const legacyCourses = await animes.find({ video: { $type: 'string', $ne: '' } }).toArray();
+  for (const course of legacyCourses) {
+    if (!Array.isArray(course.episodes) || !course.episodes.length) {
+      await animes.updateOne({ id: course.id, $or: [{ episodes: { $exists: false } }, { episodes: { $size: 0 } }] }, {
+        $set: { episodes: [{ id: crypto.randomUUID(), title: '1-qism', video: course.video, order: 1, pro: !!course.videoPro, durationSeconds: 0, views: 0 }] }
+      });
+    }
+  }
+  // Eski user ichidagi sertifikatlarni alohida kolleksiyaga ko‘chiramiz; eski hujjatlar o‘chirilmaydi.
+  const legacyUsers = await users.find({ certificates: { $exists: true, $ne: [] } }, { projection: { id: 1, certificates: 1 } }).toArray();
+  for (const u of legacyUsers) for (const c of (u.certificates || [])) {
+    if (!c?.id) continue;
+    try { await certificates.updateOne({ id: c.id }, { $setOnInsert: { ...c, userId: u.id, testId: 'legacy:' + c.id, verified: true } }, { upsert: true }); }
+    catch (e) { if (e.code !== 11000) throw e; }
+  }
+  // Server to‘xtab qolgan paytda activating holatidagi to‘lovlar admin qayta ko‘rib chiqishi uchun ochiladi.
+  await payments.updateMany({ status: 'activating' }, { $set: { status: 'activation_error', activationError: 'server_restart_during_activation' } });
+  // Owner paroli faqat o‘zgargan bo‘lsa yangilanadi; deploy har safar sessiyalarni bekor qilmaydi.
+  const ownerAccount = await users.findOne({ lower: ADMIN_USER.toLowerCase() });
+  const ownerSet = { username: ADMIN_USER, role: 'admin' };
+  if (!ownerAccount || !ownerAccount.hash || !bcrypt.compareSync(ADMIN_PASS, ownerAccount.hash)) {
+    ownerSet.hash = bcrypt.hashSync(ADMIN_PASS, 10);
+    ownerSet.tokenVersion = Number(ownerAccount?.tokenVersion || 0) + 1;
+  }
   await users.updateOne(
     { lower: ADMIN_USER.toLowerCase() },
-    { $set: { username: ADMIN_USER, hash: bcrypt.hashSync(ADMIN_PASS, 10), role: 'admin' },
-      $setOnInsert: { id: crypto.randomUUID() } },
+    { $set: ownerSet, $setOnInsert: { id: crypto.randomUUID(), lower: ADMIN_USER.toLowerCase() } },
     { upsert: true }
   );
-  app.listen(process.env.PORT || 3000, () => { console.log('Sayt ishga tushdi'); if (TELEGRAM_BOT_TOKEN) { if (!ADMIN_TELEGRAM_ID) console.warn('ADMIN_TELEGRAM_ID kiritilmagan: admin xabarlari va anonim murojaatlar ishlamaydi.'); pollTelegram(); } else console.warn('TELEGRAM_BOT_TOKEN kiritilmagan: Telegram tasdiqlash o‘chiq.'); });
+  if (TELEGRAM_BOT_TOKEN && WEBHOOK_ENABLED) {
+    const base = String(process.env.TELEGRAM_WEBHOOK_URL).replace(/\/$/, '');
+    try {
+      await telegramApi('setWebhook', { url: base + '/api/telegram/webhook', secret_token: process.env.TELEGRAM_WEBHOOK_SECRET, allowed_updates: ['message', 'callback_query'] });
+      telegramWebhookActive = true;
+    } catch (e) {
+      console.error('Webhook o‘rnatilmadi, long polling ishlatiladi:', e.message);
+      await telegramApi('deleteWebhook', { drop_pending_updates: false }).catch(() => {});
+    }
+  } else if (TELEGRAM_BOT_TOKEN) {
+    await telegramApi('deleteWebhook', { drop_pending_updates: false }).catch(e => console.warn('Webhookni o‘chirish:', e.message));
+  }
+  app.listen(process.env.PORT || 3000, () => { console.log('Sayt ishga tushdi'); if (TELEGRAM_BOT_TOKEN) { if (!ADMIN_TELEGRAM_ID) console.warn('ADMIN_TELEGRAM_ID kiritilmagan: admin xabarlari va anonim murojaatlar ishlamaydi.'); if (!WEBHOOK_ENABLED) console.warn('Telegram webhook sozlanmagan: long polling fallback ishlatiladi.'); pollTelegram(); } else console.warn('TELEGRAM_BOT_TOKEN kiritilmagan: Telegram tasdiqlash o‘chiq.'); });
 })().catch(e => { console.error('Bazaga ulanib bo\'lmadi:', e.message); process.exit(1); });
+
+
+
+
 
 
 

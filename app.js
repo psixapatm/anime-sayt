@@ -173,7 +173,7 @@ function showAuth(mode) {
   const p = el('input', { type: 'password', autocomplete: reg ? 'new-password' : 'current-password', placeholder: 'Parolingiz' });
   const closeBtn=el('button',{className:'x',textContent:'×',title:'Yopish',onclick:closeAuth});
   const form=el('div',{className:'auth-form'},closeBtn,
-    el('div',{className:'mobile-brand'},el('img',{className:'mobile-brand-mark',src:'/logo-mark.webp',alt:''}),el('div',{className:'logo m-logo'},'Dasturlash ',el('b',{textContent:'Kursi'}))),
+    el('div',{className:'mobile-brand'},el('img',{className:'mobile-brand-mark',src:'/logo-mark.png',alt:''}),el('div',{className:'logo m-logo'},'Dasturlash ',el('b',{textContent:'Kursi'}))),
     el('div',{className:'tabs'},el('button',{className:'tab'+(!reg?' on':''),textContent:'Kirish',onclick:()=>showAuth('login')}),el('button',{className:'tab'+(reg?' on':''),textContent:"Ro'yxatdan o'tish",onclick:()=>showAuth('register')})),
     el('h2',{textContent:reg?'Akaunt yaratish':'Xush kelibsiz!'}),
     el('p',{className:'sub',textContent:reg?"Login va parol o'ylab toping. Har bir Telegram akkauntidan faqat bitta sayt akkaunti ochish mumkin.":'Login va parolingizni kiriting.'}),
@@ -197,7 +197,7 @@ function showAuth(mode) {
   }});
   form.append(submitButton);
   u.onkeydown=e=>{if(e.key==='Enter')p.focus()};p.onkeydown=e=>{if(e.key==='Enter')submitButton.click()};
-  const ov=el('div',{id:'ov',className:'overlay',onclick:e=>{if(e.target===ov)closeAuth()}},el('div',{className:'auth'},el('div',{className:'auth-art'},el('img',{className:'auth-brand-mark',src:'/logo-mark.webp',alt:'Dasturlash Kursi logotipi'}),el('div',{className:'logo'},'Dasturlash ',el('b',{textContent:'Kursi'})),el('p',{textContent:"Dasturlashni dars-ma-dars o'rganing. Kiring va yangi darslarni ko'ring."}),el('div',{className:'credit'},'Created by ',el('b',{textContent:'Sobirov'}))),form));
+  const ov=el('div',{id:'ov',className:'overlay',onclick:e=>{if(e.target===ov)closeAuth()}},el('div',{className:'auth'},el('div',{className:'auth-art'},el('img',{className:'auth-brand-mark',src:'/logo-mark.png',alt:'Dasturlash Kursi logotipi'}),el('div',{className:'logo'},'Dasturlash ',el('b',{textContent:'Kursi'})),el('p',{textContent:"Dasturlashni dars-ma-dars o'rganing. Kiring va yangi darslarni ko'ring."}),el('div',{className:'credit'},'Created by ',el('b',{textContent:'Sobirov'}))),form));
   document.body.append(ov);document.body.style.overflow='hidden';u.focus();
 }
 
